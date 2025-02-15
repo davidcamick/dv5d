@@ -13,7 +13,7 @@ export default function PasswordForm({ onSave, initialData, onClose }) {
 
   const generatePassword = () => {
     const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+";
-    const length = 16;
+    const length = 50; // Changed from 16 to 50
     let password = "";
     for (let i = 0; i < length; i++) {
       password += charset[Math.floor(Math.random() * charset.length)];
@@ -24,7 +24,7 @@ export default function PasswordForm({ onSave, initialData, onClose }) {
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
       <div className="bg-gray-800 rounded-xl p-6 w-full max-w-md">
-        <h2 className="text-xl font-semibold mb-4">
+        <h2 className="text-xl font-semibold mb-4 text-white">
           {initialData ? 'Edit Password' : 'Add Password'}
         </h2>
         
@@ -35,7 +35,7 @@ export default function PasswordForm({ onSave, initialData, onClose }) {
               type="text"
               value={formData.title}
               onChange={e => setFormData(prev => ({ ...prev, title: e.target.value }))}
-              className="w-full px-4 py-2 bg-gray-700/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-4 py-2 bg-gray-700/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
             />
           </div>
 
@@ -45,7 +45,7 @@ export default function PasswordForm({ onSave, initialData, onClose }) {
               type="text"
               value={formData.username}
               onChange={e => setFormData(prev => ({ ...prev, username: e.target.value }))}
-              className="w-full px-4 py-2 bg-gray-700/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-4 py-2 bg-gray-700/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
             />
           </div>
 
@@ -56,7 +56,7 @@ export default function PasswordForm({ onSave, initialData, onClose }) {
                 type={showPassword ? "text" : "password"}
                 value={formData.password}
                 onChange={e => setFormData(prev => ({ ...prev, password: e.target.value }))}
-                className="w-full px-4 py-2 bg-gray-700/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-2 bg-gray-700/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
               />
               <button
                 type="button"
@@ -82,7 +82,7 @@ export default function PasswordForm({ onSave, initialData, onClose }) {
               type="url"
               value={formData.url}
               onChange={e => setFormData(prev => ({ ...prev, url: e.target.value }))}
-              className="w-full px-4 py-2 bg-gray-700/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-4 py-2 bg-gray-700/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
             />
           </div>
 
@@ -91,7 +91,7 @@ export default function PasswordForm({ onSave, initialData, onClose }) {
             <textarea
               value={formData.notes}
               onChange={e => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-              className="w-full px-4 py-2 bg-gray-700/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 h-24"
+              className="w-full px-4 py-2 bg-gray-700/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 h-24 text-white"
             />
           </div>
         </div>

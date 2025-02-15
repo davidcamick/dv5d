@@ -29,7 +29,6 @@ export default function Tasks() {
   const [error, setError] = useState(null);
   const [pendingTasks, setPendingTasks] = useState(new Map()); // Track tasks waiting for confirmation
   const [quickPollTimer, setQuickPollTimer] = useState(null);
-  const [pageMount, setPageMount] = useState(true);
 
   // Get unique tags from all tasks
   const availableTags = useMemo(() => {
@@ -385,12 +384,6 @@ export default function Tasks() {
     document.title = upcomingCount > 0 ? `Tasks (${upcomingCount})` : 'Tasks';
   }, [tasks]);
 
-  useEffect(() => {
-    setTimeout(() => {
-      setPageMount(false);
-    }, 1000); // Disable animations after 1 second
-  }, []);
-
   if (loading) {
     return <div className="text-center py-8">Loading tasks...</div>;
   }
@@ -427,10 +420,6 @@ export default function Tasks() {
     return (
       <div 
         className={`relative ${pendingTasks.has(task.id) ? 'opacity-50' : ''}`}
-        style={{ 
-          animationDelay: pageMount ? `${0.4 + (index * 0.1)}s` : '0s',
-          animation: pageMount ? 'fadeIn 0.5s ease forwards' : 'none'
-        }}
       >
         <div 
           className="relative bg-gray-800/50 rounded-xl p-4 shadow-lg hover:bg-gray-800/70 transition-all group"
@@ -540,7 +529,7 @@ export default function Tasks() {
       />
       <div className="container mx-auto px-4 py-8 relative z-10">
         {/* Header */}
-        <div className={`flex justify-between items-center mb-8 ${pageMount ? 'animate-fadeIn' : ''}`}>
+        <div className="flex justify-between items-center mb-8">
           <div className="flex items-center gap-4">
             <Link
               to="/"
@@ -561,7 +550,7 @@ export default function Tasks() {
         </div>
 
         {/* Controls */}
-        <div className={`flex flex-wrap gap-4 mb-4 ${pageMount ? 'animate-fadeIn delay-200' : ''}`}>
+        <div className="flex flex-wrap gap-4 mb-4">
           <button
             onClick={handleManualRefresh}
             className={`p-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-700/50 transition-all
@@ -604,7 +593,7 @@ export default function Tasks() {
 
         {/* Tags section */}
         {availableTags.length > 0 && (
-          <div className={`mb-6 flex flex-wrap gap-2 ${pageMount ? 'animate-fadeIn delay-300' : ''}`}>
+          <div className="mb-6 flex flex-wrap gap-2">
             {availableTags.map(tag => (
               <button
                 key={tag}
