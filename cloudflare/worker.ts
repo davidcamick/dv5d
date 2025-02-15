@@ -51,23 +51,36 @@ export default {
 
     try {
       const url = new URL(request.url);
-      const pathname = url.pathname.replace(/^\/+/, ''); // Remove leading slashes
-      const parts = pathname.split('/').filter(Boolean);
+      const parts = url.pathname.split('/').filter(Boolean);
 
       switch (request.method) {
         case 'GET':
-          // List all tasks by getting all KV keys and their values
-          const { keys } = await env.TASKS_KV.list();
-          const allTasks = await Promise.all(
-            keys.map(async (key) => {
-              const value = await env.TASKS_KV.get(key.name);
-              return value ? JSON.parse(value) : null;
-            })
-          );
+          // Cache the list request for 2 seconds to prevent hammering KV
+          const cacheKey = 'tasks-list';
+          const cachedData = await caches.default.match(request);
           
-          return new Response(JSON.stringify(allTasks.filter(Boolean)), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          if (cachedData) {
+            return cachedData;
+          }
+
+          // Batch read all tasks
+          const { keys } = await env.TASKS_KV.list();
+          const promises = keys.map(key => env.TASKS_KV.get(key.name));
+          const values = await Promise.all(promises);
+          const tasks = values.map(value => value ? JSON.parse(value) : null).filter(Boolean);
+          
+          const response = new Response(JSON.stringify(tasks), {
+            headers: { 
+              ...corsHeaders, 
+              'Content-Type': 'application/json',
+              'Cache-Control': 'max-age=2',
+            },
           });
+
+          // Cache the response
+          ctx.waitUntil(caches.default.put(request, response.clone()));
+          
+          return response;
 
         case 'POST':
           if (url.pathname.endsWith('/preview')) {
@@ -82,25 +95,8 @@ export default {
           newTask.id = crypto.randomUUID();
           newTask.createdAt = Date.now();
 
-          // Fetch previews for any new links
-          if (newTask.links) {
-            const previews = await Promise.all(
-              newTask.links.map(async (link) => {
-                if (!link.preview) {
-                  const preview = await fetchLinkPreview(link.url);
-                  return { ...link, preview };
-                }
-                return link;
-              })
-            );
-            newTask.links = previews;
-          }
-
-          // Store task with its text as the key
-          await env.TASKS_KV.put(
-            newTask.id,
-            JSON.stringify(newTask)
-          );
+          // Write directly without preview for speed
+          await env.TASKS_KV.put(newTask.id, JSON.stringify(newTask));
 
           return new Response(JSON.stringify(newTask), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -123,6 +119,7 @@ export default {
             id: taskId
           };
 
+          // Write directly without validation for speed
           await env.TASKS_KV.put(taskId, JSON.stringify(updatedTask));
 
           return new Response(JSON.stringify(updatedTask), {
@@ -130,7 +127,7 @@ export default {
           });
 
         case 'DELETE':
-          const deleteId = url.pathname.split('/').pop();
+          const deleteId = parts[0];
           await env.TASKS_KV.delete(deleteId);
           
           return new Response(null, {

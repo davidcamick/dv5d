@@ -21,6 +21,7 @@ export default function Tasks() {
   const [undoTimers, setUndoTimers] = useState(new Map()); // Track undo timers
   const [lastUpdate, setLastUpdate] = useState(Date.now());
   const [pendingChanges, setPendingChanges] = useState(false);
+  const [localUpdates, setLocalUpdates] = useState(new Map()); // Track pending updates
 
   // Get unique tags from all tasks
   const availableTags = useMemo(() => {
@@ -96,17 +97,17 @@ export default function Tasks() {
   // Optimize fetch to only run when needed
   const fetchTasks = async () => {
     try {
-      const response = await fetch(WORKER_URL, {
-        headers: { 
-          'Accept': 'application/json'
-        }
-      });
-
+      const response = await fetch(WORKER_URL);
       if (!response.ok) throw new Error('Failed to fetch');
       const data = await response.json();
-      if (JSON.stringify(data) !== JSON.stringify(tasks)) {
-        setTasks(data);
-      }
+      
+      // Merge server data with pending local updates
+      const mergedTasks = data.map(task => {
+        const localUpdate = localUpdates.get(task.id);
+        return localUpdate || task;
+      });
+
+      setTasks(mergedTasks);
     } catch (error) {
       console.error('Error fetching tasks:', error);
     }
@@ -115,14 +116,9 @@ export default function Tasks() {
   // Update polling to be more efficient
   useEffect(() => {
     fetchTasks();
-    const intervalId = setInterval(() => {
-      if (!pendingChanges) {
-        fetchTasks();
-      }
-    }, 2000); // Reduced polling frequency to 2 seconds
-
+    const intervalId = setInterval(fetchTasks, 5000); // Reduced to 5 second polling
     return () => clearInterval(intervalId);
-  }, [pendingChanges]);
+  }, []); // Remove pendingChanges dependency
 
   // Remove the loading state since we'll always be updating
   const [loading, setLoading] = useState(false);
@@ -141,20 +137,17 @@ export default function Tasks() {
       };
 
       // Optimistic update
-      if (isNewTask) {
-        setTasks(prev => [...prev, fullTaskData]);
-      } else {
-        setTasks(prev => prev.map(t => 
-          t.id === newId ? fullTaskData : t
-        ));
-      }
+      setLocalUpdates(prev => new Map(prev).set(newId, fullTaskData));
+      setTasks(prev => {
+        if (isNewTask) return [...prev, fullTaskData];
+        return prev.map(t => t.id === newId ? fullTaskData : t);
+      });
 
       // UI updates
       setIsEditorOpen(false);
       setEditingTask(null);
-      setPendingChanges(true);
 
-      // API call
+      // API call in background
       const method = isNewTask ? 'POST' : 'PUT';
       const url = isNewTask ? WORKER_URL : `${WORKER_URL}/${newId}`;
       
@@ -170,11 +163,14 @@ export default function Tasks() {
         throw new Error('Failed to save task');
       }
 
-      // Refresh tasks list
-      debouncedFetch();
+      // Remove from local updates after successful save
+      setLocalUpdates(prev => {
+        const next = new Map(prev);
+        next.delete(newId);
+        return next;
+      });
     } catch (error) {
       console.error('Error saving task:', error);
-      setPendingChanges(false);
     }
   };
 
