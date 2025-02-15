@@ -19,6 +19,8 @@ export default function Tasks() {
   const [sortConfig, setSortConfig] = useState({ field: null, direction: null });
   const [deletedTasks, setDeletedTasks] = useState(new Map()); // Track deleted tasks for undo
   const [undoTimers, setUndoTimers] = useState(new Map()); // Track undo timers
+  const [lastUpdate, setLastUpdate] = useState(Date.now());
+  const [pendingChanges, setPendingChanges] = useState(false);
 
   // Get unique tags from all tasks
   const availableTags = useMemo(() => {
@@ -82,63 +84,78 @@ export default function Tasks() {
     return getSortedTasks(filtered);
   }, [tasks, selectedTags, sortConfig]);
 
+  // Debounce the fetch to prevent excessive API calls
+  const debouncedFetch = useMemo(() => {
+    let timeoutId;
+    return () => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(fetchTasks, 200);
+    };
+  }, []);
+
+  // Optimize fetch to only run when needed
   const fetchTasks = async () => {
     try {
       const response = await fetch(WORKER_URL, {
         headers: { 
-          'Accept': 'application/json'
+          'Accept': 'application/json',
+          'If-Modified-Since': new Date(lastUpdate).toUTCString()
         }
       });
+      
+      if (response.status === 304) {
+        // Data hasn't changed, skip update
+        return;
+      }
+
       if (!response.ok) throw new Error('Failed to fetch');
       const data = await response.json();
-      // Only update if data has changed
-      if (JSON.stringify(data) !== JSON.stringify(tasks)) {
-        setTasks(data);
-      }
+      setTasks(data);
+      setLastUpdate(Date.now());
+      setPendingChanges(false);
     } catch (error) {
       console.error('Error fetching tasks:', error);
     }
   };
 
-  // Add polling effect
+  // Update polling to be more efficient
   useEffect(() => {
-    // Initial fetch
     fetchTasks();
+    const intervalId = setInterval(() => {
+      if (!pendingChanges) {
+        fetchTasks();
+      }
+    }, 2000); // Reduced polling frequency to 2 seconds
 
-    // Set up polling every 1 second
-    const intervalId = setInterval(fetchTasks, 1000);
-
-    // Cleanup on unmount
     return () => clearInterval(intervalId);
-  }, []); // Empty dependency array since fetchTasks is stable
+  }, [pendingChanges]);
 
   // Remove the loading state since we'll always be updating
   const [loading, setLoading] = useState(false);
 
-  // Modify handleSaveTask to be optimistic
+  // Optimize save task
   const handleSaveTask = async (taskData) => {
     try {
-      // Optimistically update the UI
+      // Optimistic update
       if (taskData.id) {
-        // Update existing task
         setTasks(prev => prev.map(t => 
           t.id === taskData.id ? taskData : t
         ));
       } else {
-        // Add new task
         const newTask = {
           ...taskData,
-          id: crypto.randomUUID(), // Generate temporary ID
+          id: crypto.randomUUID(),
           createdAt: Date.now()
         };
         setTasks(prev => [...prev, newTask]);
+        taskData = newTask;
       }
 
-      // Close the editor immediately
       setIsEditorOpen(false);
       setEditingTask(null);
+      setPendingChanges(true);
 
-      // Then send to server
+      // Background save
       const method = taskData.id ? 'PUT' : 'POST';
       const response = await fetch(WORKER_URL + (taskData.id ? `/${taskData.id}` : ''), {
         method,
@@ -149,11 +166,10 @@ export default function Tasks() {
       });
       
       if (!response.ok) throw new Error('Failed to save task');
-      
-      // Server update will be caught by polling
+      debouncedFetch();
     } catch (error) {
       console.error('Error saving task:', error);
-      // Could add error state handling here if needed
+      setPendingChanges(false);
     }
   };
 
@@ -248,6 +264,7 @@ export default function Tasks() {
     );
   };
 
+  // Optimize task completion
   const handleTaskCompletion = async (task) => {
     const taskElement = document.getElementById(`task-${task.id}`);
     const containerElement = taskElement?.parentElement;
@@ -262,10 +279,26 @@ export default function Tasks() {
     }
     
     const updatedTask = { ...task, completed: !task.completed };
-    await handleSaveTask(updatedTask);
     
+    // Optimistic update
+    setTasks(prev => prev.map(t => 
+      t.id === task.id ? updatedTask : t
+    ));
+    setPendingChanges(true);
+
     if (updatedTask.completed) {
       setShowCompleted(false);
+    }
+
+    // Background save
+    try {
+      await handleSaveTask(updatedTask);
+    } catch (error) {
+      // Revert on error
+      setTasks(prev => prev.map(t => 
+        t.id === task.id ? task : t
+      ));
+      setPendingChanges(false);
     }
   };
 
@@ -546,7 +579,7 @@ export default function Tasks() {
                             target="_blank"
                             rel="noopener noreferrer"
                             className="mt-2 block p-2 rounded bg-gray-700/50 hover:bg-gray-700/70 text-blue-400 text-sm"
-                          >
+                          ></a>
                             {link.url}
                           </a>
                         ))}
@@ -582,7 +615,7 @@ export default function Tasks() {
 
         {/* Add undo button for recently deleted tasks */}
         {deletedTasks.size > 0 && (
-          <div className="fixed bottom-4 right-4 space-y-2">
+          <div className="fixed bottom-4 right-4 space-y-2"></div>
             {Array.from(deletedTasks).map(([id, task]) => (
               <div key={id} className="bg-gray-800 p-4 rounded-lg shadow-lg flex items-center gap-4">
                 <span className="text-gray-300">Task deleted: {task.text}</span>
