@@ -33,7 +33,7 @@ interface Task {
 }
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const corsHeaders = {
       'Access-Control-Allow-Origin': 'https://dv5d.org',
       'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
@@ -55,30 +55,21 @@ export default {
 
       switch (request.method) {
         case 'GET':
-          // Cache the list request for 2 seconds to prevent hammering KV
-          const cacheKey = 'tasks-list';
-          const cachedData = await caches.default.match(request);
-          
-          if (cachedData) {
-            return cachedData;
-          }
-
-          // Batch read all tasks
+          // Simplified caching approach
           const { keys } = await env.TASKS_KV.list();
           const promises = keys.map(key => env.TASKS_KV.get(key.name));
           const values = await Promise.all(promises);
-          const tasks = values.map(value => value ? JSON.parse(value) : null).filter(Boolean);
+          const tasks = values
+            .map(value => value ? JSON.parse(value) : null)
+            .filter(Boolean);
           
           const response = new Response(JSON.stringify(tasks), {
             headers: { 
               ...corsHeaders, 
               'Content-Type': 'application/json',
-              'Cache-Control': 'max-age=2',
+              'Cache-Control': 'no-cache' // Disable caching for now
             },
           });
-
-          // Cache the response
-          ctx.waitUntil(caches.default.put(request, response.clone()));
           
           return response;
 

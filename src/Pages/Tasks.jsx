@@ -7,6 +7,7 @@ import {
   ChevronDownIcon, ChevronUpIcon, CheckIcon,
   ArrowUpIcon, ArrowDownIcon
 } from '@heroicons/react/24/outline';
+import StatusDot from '../components/ui/StatusDot';
 
 const WORKER_URL = 'https://dv5d-tasks.accounts-abd.workers.dev';
 
@@ -22,6 +23,7 @@ export default function Tasks() {
   const [lastUpdate, setLastUpdate] = useState(Date.now());
   const [pendingChanges, setPendingChanges] = useState(false);
   const [localUpdates, setLocalUpdates] = useState(new Map()); // Track pending updates
+  const [taskStatuses, setTaskStatuses] = useState(new Map());
 
   // Get unique tags from all tasks
   const availableTags = useMemo(() => {
@@ -136,6 +138,9 @@ export default function Tasks() {
         createdAt: isNewTask ? Date.now() : taskData.createdAt
       };
 
+      // Set pending status
+      setTaskStatuses(prev => new Map(prev).set(newId, 'pending'));
+
       // Optimistic update
       setLocalUpdates(prev => new Map(prev).set(newId, fullTaskData));
       setTasks(prev => {
@@ -163,6 +168,18 @@ export default function Tasks() {
         throw new Error('Failed to save task');
       }
 
+      // Update status to synced after successful save
+      setTaskStatuses(prev => new Map(prev).set(newId, 'synced'));
+
+      // After 5 seconds, remove the status indicator
+      setTimeout(() => {
+        setTaskStatuses(prev => {
+          const next = new Map(prev);
+          next.delete(newId);
+          return next;
+        });
+      }, 5000);
+
       // Remove from local updates after successful save
       setLocalUpdates(prev => {
         const next = new Map(prev);
@@ -171,6 +188,7 @@ export default function Tasks() {
       });
     } catch (error) {
       console.error('Error saving task:', error);
+      // Keep status as pending on error
     }
   };
 
@@ -415,6 +433,10 @@ export default function Tasks() {
                 className="bg-gray-800/50 rounded-lg p-4 shadow-lg hover:bg-gray-800/70 transition-all task-item"
               >
                 <div className="flex items-start gap-4">
+                  {/* Add status dot */}
+                  <div className="mt-2">
+                    <StatusDot status={taskStatuses.get(task.id)} />
+                  </div>
                   <button
                     onClick={() => handleTaskCompletion(task)}
                     className="custom-checkbox mt-1.5 w-5 h-5 rounded-full border-2 border-gray-400 
@@ -524,6 +546,10 @@ export default function Tasks() {
                 {completedTasks.map((task) => (
                   <div key={task.id} className="bg-gray-800/30 rounded-lg p-4 shadow-lg">
                     <div className="flex items-start gap-4">
+                      {/* Add status dot */}
+                      <div className="mt-2">
+                        <StatusDot status={taskStatuses.get(task.id)} />
+                      </div>
                       <button
                         onClick={() => handleTaskCompletion(task)}
                         className="custom-checkbox mt-1.5 w-5 h-5 rounded-full border-2 border-gray-400 
