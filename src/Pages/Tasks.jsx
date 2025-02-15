@@ -98,21 +98,15 @@ export default function Tasks() {
     try {
       const response = await fetch(WORKER_URL, {
         headers: { 
-          'Accept': 'application/json',
-          'If-Modified-Since': new Date(lastUpdate).toUTCString()
+          'Accept': 'application/json'
         }
       });
-      
-      if (response.status === 304) {
-        // Data hasn't changed, skip update
-        return;
-      }
 
       if (!response.ok) throw new Error('Failed to fetch');
       const data = await response.json();
-      setTasks(data);
-      setLastUpdate(Date.now());
-      setPendingChanges(false);
+      if (JSON.stringify(data) !== JSON.stringify(tasks)) {
+        setTasks(data);
+      }
     } catch (error) {
       console.error('Error fetching tasks:', error);
     }

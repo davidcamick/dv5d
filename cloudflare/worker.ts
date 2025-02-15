@@ -37,7 +37,7 @@ export default {
     const corsHeaders = {
       'Access-Control-Allow-Origin': 'https://dv5d.org',
       'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, X-User-Email',
+      'Access-Control-Allow-Headers': 'Content-Type, X-User-Email, If-Modified-Since',
       'Access-Control-Max-Age': '86400',
     };
 
