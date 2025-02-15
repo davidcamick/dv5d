@@ -579,7 +579,7 @@ export default function Tasks() {
                             target="_blank"
                             rel="noopener noreferrer"
                             className="mt-2 block p-2 rounded bg-gray-700/50 hover:bg-gray-700/70 text-blue-400 text-sm"
-                          ></a>
+                          >
                             {link.url}
                           </a>
                         ))}
