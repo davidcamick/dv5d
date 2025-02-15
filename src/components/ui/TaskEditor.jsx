@@ -35,12 +35,10 @@ export default function TaskEditor({ task, onSave, onClose }) {
     e.preventDefault();
     if (newLink.trim()) {
       try {
-        // Fetch preview when adding a link
         const response = await fetch(`${WORKER_URL}/preview`, {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json',
-            'X-User-Email': getUserEmail()
+            'Content-Type': 'application/json'
           },
           body: JSON.stringify({ url: newLink.trim() })
         });

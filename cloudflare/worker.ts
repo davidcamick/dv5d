@@ -36,7 +36,7 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const corsHeaders = {
       'Access-Control-Allow-Origin': 'https://dv5d.org',
-      'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, X-User-Email',
       'Access-Control-Max-Age': '86400',
     };
@@ -49,27 +49,21 @@ export default {
       });
     }
 
-    const userEmail = request.headers.get('X-User-Email');
-    if (!userEmail) {
-      return new Response('Unauthorized', { 
-        status: 401,
-        headers: corsHeaders
-      });
-    }
-
     const url = new URL(request.url);
 
     try {
       switch (request.method) {
         case 'GET':
-          if (url.pathname.endsWith('/lists')) {
-            const lists = await env.TASKS_KV.get(`lists:${userEmail}`);
-            return new Response(lists || '[]', {
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            });
-          }
-          const tasks = await env.TASKS_KV.get(`tasks:${userEmail}`);
-          return new Response(tasks || '[]', {
+          // List all tasks by getting all KV keys and their values
+          const { keys } = await env.TASKS_KV.list();
+          const allTasks = await Promise.all(
+            keys.map(async (key) => {
+              const value = await env.TASKS_KV.get(key.name);
+              return value ? JSON.parse(value) : null;
+            })
+          );
+          
+          return new Response(JSON.stringify(allTasks.filter(Boolean)), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
 
@@ -82,23 +76,9 @@ export default {
             });
           }
 
-          if (url.pathname.endsWith('/lists')) {
-            const list: TaskList = await request.json();
-            const existingLists: TaskList[] = JSON.parse(
-              (await env.TASKS_KV.get(`lists:${userEmail}`)) || '[]'
-            );
-            list.id = crypto.randomUUID();
-            list.createdAt = Date.now();
-            existingLists.push(list);
-            await env.TASKS_KV.put(`lists:${userEmail}`, JSON.stringify(existingLists));
-            return new Response(JSON.stringify(list), {
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            });
-          }
           const newTask: Task = await request.json();
-          let existingTasks: Task[] = JSON.parse(
-            (await env.TASKS_KV.get(`tasks:${userEmail}`)) || '[]'
-          );
+          newTask.id = crypto.randomUUID();
+          newTask.createdAt = Date.now();
 
           // Fetch previews for any new links
           if (newTask.links) {
@@ -114,10 +94,12 @@ export default {
             newTask.links = previews;
           }
 
-          newTask.id = crypto.randomUUID();
-          newTask.createdAt = Date.now();
-          existingTasks.push(newTask);
-          await env.TASKS_KV.put(`tasks:${userEmail}`, JSON.stringify(existingTasks));
+          // Store task with its text as the key
+          await env.TASKS_KV.put(
+            newTask.id,
+            JSON.stringify(newTask)
+          );
+
           return new Response(JSON.stringify(newTask), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
@@ -126,27 +108,21 @@ export default {
           const taskToUpdate: Task = await request.json();
           const updateId = url.pathname.split('/').pop();
           
-          existingTasks = JSON.parse(
-            (await env.TASKS_KV.get(`tasks:${userEmail}`)) || '[]'
-          );
-          
-          const taskIndex = existingTasks.findIndex(t => t.id === updateId);
-          if (taskIndex === -1) {
+          const existingTask = await env.TASKS_KV.get(updateId);
+          if (!existingTask) {
             return new Response('Task not found', { 
               status: 404, 
               headers: corsHeaders 
             });
           }
 
-          // Preserve creation date and ID while updating other fields
           const updatedTask = {
             ...taskToUpdate,
             id: updateId,
-            createdAt: existingTasks[taskIndex].createdAt
+            createdAt: JSON.parse(existingTask).createdAt
           };
 
-          existingTasks[taskIndex] = updatedTask;
-          await env.TASKS_KV.put(`tasks:${userEmail}`, JSON.stringify(existingTasks));
+          await env.TASKS_KV.put(updateId, JSON.stringify(updatedTask));
 
           return new Response(JSON.stringify(updatedTask), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -154,21 +130,31 @@ export default {
 
         case 'DELETE':
           const deleteId = url.pathname.split('/').pop();
-          existingTasks = JSON.parse(
-            (await env.TASKS_KV.get(`tasks:${userEmail}`)) || '[]'
-          );
-          const updatedTasks = existingTasks.filter((t) => t.id !== deleteId);
-          await env.TASKS_KV.put(`tasks:${userEmail}`, JSON.stringify(updatedTasks));
+          await env.TASKS_KV.delete(deleteId);
+          
           return new Response(null, {
             status: 204,
             headers: corsHeaders,
           });
 
         default:
-          return new Response('Method not allowed', { status: 405, headers: corsHeaders });
+          return new Response('Method not allowed', { 
+            status: 405, 
+            headers: corsHeaders 
+          });
       }
     } catch (error) {
-      return new Response('Internal Server Error', { status: 500, headers: corsHeaders });
+      console.error('Worker error:', error);
+      return new Response(
+        JSON.stringify({ error: 'Internal Server Error', details: error.message }), 
+        { 
+          status: 500, 
+          headers: { 
+            ...corsHeaders,
+            'Content-Type': 'application/json'
+          } 
+        }
+      );
     }
   },
 };

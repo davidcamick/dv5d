@@ -44,7 +44,6 @@ export default function Tasks() {
       console.log('Fetching tasks...');
       const response = await fetch(WORKER_URL, {
         headers: { 
-          'X-User-Email': getUserEmail(),
           'Accept': 'application/json'
         }
       });
@@ -60,13 +59,11 @@ export default function Tasks() {
 
   const handleSaveTask = async (taskData) => {
     try {
-      // If task has an ID, it's an edit operation
       const method = taskData.id ? 'PUT' : 'POST';
       const response = await fetch(WORKER_URL + (taskData.id ? `/${taskData.id}` : ''), {
         method,
         headers: {
-          'Content-Type': 'application/json',
-          'X-User-Email': getUserEmail()
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify(taskData)
       });
@@ -82,8 +79,7 @@ export default function Tasks() {
   const deleteTask = async (id) => {
     try {
       const response = await fetch(`${WORKER_URL}/${id}`, {
-        method: 'DELETE',
-        headers: { 'X-User-Email': getUserEmail() }
+        method: 'DELETE'
       });
       if (!response.ok) throw new Error('Failed to delete task');
       fetchTasks();
