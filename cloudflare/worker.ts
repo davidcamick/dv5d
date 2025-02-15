@@ -95,12 +95,15 @@ export default {
               headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             });
           }
-          const task: Task = await request.json();
+          const newTask: Task = await request.json();
+          let existingTasks: Task[] = JSON.parse(
+            (await env.TASKS_KV.get(`tasks:${userEmail}`)) || '[]'
+          );
 
           // Fetch previews for any new links
-          if (task.links) {
+          if (newTask.links) {
             const previews = await Promise.all(
-              task.links.map(async (link) => {
+              newTask.links.map(async (link) => {
                 if (!link.preview) {
                   const preview = await fetchLinkPreview(link.url);
                   return { ...link, preview };
@@ -108,29 +111,26 @@ export default {
                 return link;
               })
             );
-            task.links = previews;
+            newTask.links = previews;
           }
 
-          const existingTasks: Task[] = JSON.parse(
-            (await env.TASKS_KV.get(`tasks:${userEmail}`)) || '[]'
-          );
-          task.id = crypto.randomUUID();
-          task.createdAt = Date.now();
-          existingTasks.push(task);
+          newTask.id = crypto.randomUUID();
+          newTask.createdAt = Date.now();
+          existingTasks.push(newTask);
           await env.TASKS_KV.put(`tasks:${userEmail}`, JSON.stringify(existingTasks));
-          return new Response(JSON.stringify(task), {
+          return new Response(JSON.stringify(newTask), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
 
         case 'PUT':
           const taskToUpdate: Task = await request.json();
-          const taskId = url.pathname.split('/').pop();
+          const updateId = url.pathname.split('/').pop();
           
-          const existingTasks: Task[] = JSON.parse(
+          existingTasks = JSON.parse(
             (await env.TASKS_KV.get(`tasks:${userEmail}`)) || '[]'
           );
           
-          const taskIndex = existingTasks.findIndex(t => t.id === taskId);
+          const taskIndex = existingTasks.findIndex(t => t.id === updateId);
           if (taskIndex === -1) {
             return new Response('Task not found', { 
               status: 404, 
@@ -141,7 +141,7 @@ export default {
           // Preserve creation date and ID while updating other fields
           const updatedTask = {
             ...taskToUpdate,
-            id: taskId,
+            id: updateId,
             createdAt: existingTasks[taskIndex].createdAt
           };
 
@@ -153,11 +153,11 @@ export default {
           });
 
         case 'DELETE':
-          const taskId = url.pathname.split('/').pop();
-          const currentTasks: Task[] = JSON.parse(
+          const deleteId = url.pathname.split('/').pop();
+          existingTasks = JSON.parse(
             (await env.TASKS_KV.get(`tasks:${userEmail}`)) || '[]'
           );
-          const updatedTasks = currentTasks.filter((t) => t.id !== taskId);
+          const updatedTasks = existingTasks.filter((t) => t.id !== deleteId);
           await env.TASKS_KV.put(`tasks:${userEmail}`, JSON.stringify(updatedTasks));
           return new Response(null, {
             status: 204,
