@@ -26,15 +26,18 @@ export default function Tasks() {
     return Array.from(tags);
   }, [tasks]);
 
-  // Filter tasks based on completion and selected tags
-  const filteredTasks = useMemo(() => {
-    return tasks.filter(task => {
-      const matchesCompletion = showCompleted ? task.completed : !task.completed;
-      const matchesTags = selectedTags.length === 0 || 
-        task.tags?.some(tag => selectedTags.includes(tag));
-      return matchesCompletion && matchesTags;
-    });
-  }, [tasks, showCompleted, selectedTags]);
+  // Separate active and completed tasks
+  const activeTasks = useMemo(() => {
+    return tasks.filter(task => !task.completed && (
+      selectedTags.length === 0 || task.tags?.some(tag => selectedTags.includes(tag))
+    ));
+  }, [tasks, selectedTags]);
+
+  const completedTasks = useMemo(() => {
+    return tasks.filter(task => task.completed && (
+      selectedTags.length === 0 || task.tags?.some(tag => selectedTags.includes(tag))
+    ));
+  }, [tasks, selectedTags]);
 
   const fetchTasks = async () => {
     try {
@@ -57,8 +60,10 @@ export default function Tasks() {
 
   const handleSaveTask = async (taskData) => {
     try {
-      const response = await fetch(WORKER_URL, {
-        method: 'POST',
+      // If task has an ID, it's an edit operation
+      const method = taskData.id ? 'PUT' : 'POST';
+      const response = await fetch(WORKER_URL + (taskData.id ? `/${taskData.id}` : ''), {
+        method,
         headers: {
           'Content-Type': 'application/json',
           'X-User-Email': getUserEmail()
@@ -98,6 +103,15 @@ export default function Tasks() {
         ? prev.filter(t => t !== tag)
         : [...prev, tag]
     );
+  };
+
+  const handleTaskCompletion = async (task) => {
+    const updatedTask = { ...task, completed: !task.completed };
+    await handleSaveTask(updatedTask);
+    // Automatically hide completed tasks section when completing a task
+    if (updatedTask.completed) {
+      setShowCompleted(false);
+    }
   };
 
   useEffect(() => {
@@ -143,7 +157,7 @@ export default function Tasks() {
 
         {/* Active tasks */}
         <div className="space-y-4 mb-8">
-          {filteredTasks.map((task) => (
+          {activeTasks.map((task) => (
             <div
               key={task.id}
               className="bg-gray-800/50 rounded-lg p-4 shadow-lg hover:bg-gray-800/70 transition-all"
@@ -151,8 +165,8 @@ export default function Tasks() {
               <div className="flex items-start gap-4">
                 <input
                   type="checkbox"
-                  checked={task.completed}
-                  onChange={() => handleSaveTask({ ...task, completed: !task.completed })}
+                  checked={false}
+                  onChange={() => handleTaskCompletion(task)}
                   className="mt-1.5 rounded border-gray-600"
                 />
                 <div className="flex-1">
@@ -225,18 +239,107 @@ export default function Tasks() {
               </div>
             </div>
           ))}
+          {activeTasks.length === 0 && (
+            <div className="text-center py-8 text-gray-400">
+              No active tasks {selectedTags.length > 0 ? 'with selected tags' : ''}
+            </div>
+          )}
         </div>
 
         {/* Completed tasks section */}
-        {tasks.some(task => task.completed) && (
+        {completedTasks.length > 0 && (
           <div className="mt-8 border-t border-gray-700 pt-4">
             <button
               onClick={() => setShowCompleted(prev => !prev)}
-              className="flex items-center gap-2 text-gray-400 hover:text-white"
+              className="flex items-center gap-2 text-gray-400 hover:text-white w-full"
             >
               {showCompleted ? <ChevronUpIcon className="w-5 h-5" /> : <ChevronDownIcon className="w-5 h-5" />}
-              Completed Tasks ({tasks.filter(t => t.completed).length})
+              <span>Completed Tasks ({completedTasks.length})</span>
             </button>
+
+            {showCompleted && (
+              <div className="space-y-4 mt-4 opacity-75"></div>
+                {completedTasks.map((task) => (
+                  <div key={task.id} className="bg-gray-800/30 rounded-lg p-4 shadow-lg">
+                    <div className="flex items-start gap-4">
+                      <input
+                        type="checkbox"
+                        checked={true}
+                        onChange={() => handleTaskCompletion(task)}
+                        className="mt-1.5 rounded border-gray-600 checked:bg-gray-600"
+                      />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className={`text-white text-lg ${task.completed ? 'line-through opacity-50' : ''}`}>
+                            {task.text}
+                          </span>
+                          {task.priority && (
+                            <span className={`px-2 py-0.5 rounded text-xs ${
+                              task.priority === 'high' ? 'bg-red-500' :
+                              task.priority === 'medium' ? 'bg-yellow-500' :
+                              'bg-blue-500'
+                            }`}>
+                              {task.priority}
+                            </span>
+                          )}
+                        </div>
+
+                        {task.dueDate && (
+                          <div className="flex items-center gap-1 text-gray-400 text-sm mt-1">
+                            <CalendarIcon className="w-4 h-4" />
+                            {new Date(task.dueDate).toLocaleDateString()}
+                          </div>
+                        )}
+
+                        {task.tags?.length > 0 && (
+                          <div className="flex items-center gap-2 mt-2"></div>
+                            <TagIcon className="w-4 h-4 text-gray-400" />
+                            {task.tags.map(tag => (
+                              <span key={tag} className="px-2 py-0.5 bg-gray-700 rounded-full text-xs text-white">
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+
+                        {task.links?.map(link => (
+                          <a
+                            key={link.url}
+                            href={link.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="mt-2 block p-2 rounded bg-gray-700/50 hover:bg-gray-700/70 text-blue-400 text-sm"
+                          >
+                            {link.url}
+                          </a>
+                        ))}
+
+                        {task.notes && (
+                          <p className="mt-2 text-gray-400 text-sm whitespace-pre-wrap">
+                            {task.notes}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => openEditor(task)}
+                          className="p-2 text-gray-400 hover:text-white rounded-lg hover:bg-gray-700/50"
+                        ></button>
+                          <PencilIcon className="w-5 h-5" />
+                        </button>
+                        <button
+                          onClick={() => deleteTask(task.id)}
+                          className="p-2 text-red-400 hover:text-red-500 rounded-lg hover:bg-gray-700/50"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

@@ -122,6 +122,36 @@ export default {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
 
+        case 'PUT':
+          const taskToUpdate: Task = await request.json();
+          const taskId = url.pathname.split('/').pop();
+          
+          const existingTasks: Task[] = JSON.parse(
+            (await env.TASKS_KV.get(`tasks:${userEmail}`)) || '[]'
+          );
+          
+          const taskIndex = existingTasks.findIndex(t => t.id === taskId);
+          if (taskIndex === -1) {
+            return new Response('Task not found', { 
+              status: 404, 
+              headers: corsHeaders 
+            });
+          }
+
+          // Preserve creation date and ID while updating other fields
+          const updatedTask = {
+            ...taskToUpdate,
+            id: taskId,
+            createdAt: existingTasks[taskIndex].createdAt
+          };
+
+          existingTasks[taskIndex] = updatedTask;
+          await env.TASKS_KV.put(`tasks:${userEmail}`, JSON.stringify(existingTasks));
+
+          return new Response(JSON.stringify(updatedTask), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+
         case 'DELETE':
           const taskId = url.pathname.split('/').pop();
           const currentTasks: Task[] = JSON.parse(
