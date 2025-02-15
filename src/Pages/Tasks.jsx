@@ -5,7 +5,7 @@ import {
   PlusIcon, PencilSquareIcon as PencilIcon,
   CalendarDaysIcon as CalendarIcon, TagIcon,
   ChevronDownIcon, ChevronUpIcon, CheckIcon,
-  ArrowUpIcon, ArrowDownIcon
+  ArrowUpIcon, ArrowDownIcon, ArrowPathIcon // Add this import
 } from '@heroicons/react/24/outline';
 import StatusDot from '../components/ui/StatusDot';
 
@@ -25,6 +25,7 @@ export default function Tasks() {
   const [localUpdates, setLocalUpdates] = useState(new Map()); // Track pending updates
   const [taskStatuses, setTaskStatuses] = useState(new Map());
   const [localTasks, setLocalTasks] = useState(new Map()); // Tasks waiting for server confirmation
+  const [isRefreshing, setIsRefreshing] = useState(false); // Add this state
 
   // Get unique tags from all tasks
   const availableTags = useMemo(() => {
@@ -139,6 +140,30 @@ export default function Tasks() {
       setTasks(mergedTasks);
     } catch (error) {
       console.error('Error fetching tasks:', error);
+    }
+  };
+
+  // Add new function for manual refresh
+  const handleManualRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      const response = await fetch(WORKER_URL);
+      if (!response.ok) throw new Error('Failed to fetch');
+      const serverTasks = await response.json();
+      
+      // Merge with local tasks, keeping local ones
+      const serverTaskIds = new Set(serverTasks.map(t => t.id));
+      const mergedTasks = [
+        ...serverTasks,
+        ...Array.from(localTasks.values())
+          .filter(task => !serverTaskIds.has(task.id))
+      ];
+      
+      setTasks(mergedTasks);
+    } catch (error) {
+      console.error('Error refreshing tasks:', error);
+    } finally {
+      setIsRefreshing(false);
     }
   };
 
@@ -393,6 +418,15 @@ export default function Tasks() {
 
         {/* Sort controls with fade-in */}
         <div className="flex gap-4 mb-4 fade-in" style={{ animationDelay: '0.2s' }}>
+          <button
+            onClick={handleManualRefresh}
+            className={`p-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-700/50 transition-all
+              ${isRefreshing ? 'animate-spin text-blue-400' : ''}`}
+            disabled={isRefreshing}
+          >
+            <ArrowPathIcon className="w-5 h-5" />
+          </button>
+          
           <button
             onClick={() => handleSort('date')}
             className={`px-3 py-1 rounded-lg flex items-center gap-1 ${
