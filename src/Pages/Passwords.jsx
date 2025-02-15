@@ -23,6 +23,7 @@ export default function Passwords() {
   const [editingPassword, setEditingPassword] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [error, setError] = useState(null);
+  const [showChangePassword, setShowChangePassword] = useState(false);
 
   // Check for biometric availability
   const [isBiometricAvailable, setIsBiometricAvailable] = useState(false);
@@ -105,6 +106,28 @@ export default function Passwords() {
       await navigator.clipboard.writeText(text);
     } catch (error) {
       setError('Failed to copy to clipboard');
+    }
+  };
+
+  const handleChangeMasterPassword = async (newPassword) => {
+    try {
+      // Re-encrypt all passwords with new master password
+      const encrypted = await encryptData(passwords, newPassword);
+      
+      // Save to server
+      await fetch(WORKER_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(encrypted)
+      });
+
+      // Update local master password
+      setMasterPassword(newPassword);
+      sessionStorage.setItem('masterPassword', newPassword);
+      setShowChangePassword(false);
+      setError('Master password updated successfully');
+    } catch (error) {
+      setError('Failed to update master password');
     }
   };
 
@@ -219,6 +242,20 @@ export default function Passwords() {
             Password Manager
           </AuroraText>
           <div className="flex-1" />
+          {isBiometricAvailable && (
+            <button
+              onClick={handleBiometricSetup}
+              className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600"
+            >
+              Setup Biometric
+            </button>
+          )}
+          <button
+            onClick={() => setShowChangePassword(true)}
+            className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600"
+          >
+            Change Master Password
+          </button>
           <button
             onClick={() => {
               setEditingPassword(null);
@@ -309,13 +346,56 @@ export default function Passwords() {
         />
       )}
 
-      {!isLocked && (
-        <button
-          onClick={handleBiometricSetup}
-          className="mt-4 px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600"
-        >
-          Setup Biometric Unlock
-        </button>
+      {showChangePassword && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-gray-800 rounded-xl p-6 w-full max-w-md">
+            <h2 className="text-xl font-semibold mb-4">Change Master Password</h2>
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              const newPassword = e.target.newPassword.value;
+              const confirmPassword = e.target.confirmPassword.value;
+              
+              if (newPassword !== confirmPassword) {
+                setError('Passwords do not match');
+                return;
+              }
+              
+              handleChangeMasterPassword(newPassword);
+            }}>
+              <input
+                type="password"
+                name="newPassword"
+                placeholder="New Master Password"
+                className="w-full px-4 py-2 bg-gray-700/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
+                required
+                minLength={12}
+              />
+              <input
+                type="password"
+                name="confirmPassword"
+                placeholder="Confirm New Password"
+                className="w-full px-4 py-2 bg-gray-700/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
+                required
+                minLength={12}
+              />
+              <div className="flex justify-end gap-4">
+                <button
+                  type="button"
+                  onClick={() => setShowChangePassword(false)}
+                  className="px-4 py-2 text-gray-400 hover:text-white"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+                >
+                  Update Password
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
 
       {error && (

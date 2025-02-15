@@ -1,3 +1,75 @@
+// Add these encryption utility functions at the top
+async function encryptForStorage(data, key) {
+  const encoder = new TextEncoder();
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  
+  const derivedKey = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(key),
+    { name: 'PBKDF2' },
+    false,
+    ['deriveKey']
+  );
+  
+  const aesKey = await crypto.subtle.deriveKey(
+    {
+      name: 'PBKDF2',
+      salt,
+      iterations: 100000,
+      hash: 'SHA-256'
+    },
+    derivedKey,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt']
+  );
+
+  const encrypted = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv },
+    aesKey,
+    encoder.encode(data)
+  );
+
+  return {
+    encrypted: Array.from(new Uint8Array(encrypted)),
+    iv: Array.from(iv),
+    salt: Array.from(salt)
+  };
+}
+
+async function decryptFromStorage(encryptedData, key) {
+  const decoder = new TextDecoder();
+  const derivedKey = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(key),
+    { name: 'PBKDF2' },
+    false,
+    ['deriveKey']
+  );
+  
+  const aesKey = await crypto.subtle.deriveKey(
+    {
+      name: 'PBKDF2',
+      salt: new Uint8Array(encryptedData.salt),
+      iterations: 100000,
+      hash: 'SHA-256'
+    },
+    derivedKey,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['decrypt']
+  );
+
+  const decrypted = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv: new Uint8Array(encryptedData.iv) },
+    aesKey,
+    new Uint8Array(encryptedData.encrypted)
+  );
+
+  return decoder.decode(decrypted);
+}
+
 export async function registerBiometric(masterPassword) {
   try {
     const publicKeyCredentialCreationOptions = {
@@ -26,10 +98,15 @@ export async function registerBiometric(masterPassword) {
     });
 
     // Store encrypted master password with credential ID
-    const encryptedMasterPass = await encryptForStorage(masterPassword, credential.id);
+    const credentialId = Array.from(new Uint8Array(credential.rawId));
+    const encryptedData = await encryptForStorage(
+      masterPassword,
+      credentialId.join(',')
+    );
+    
     localStorage.setItem('biometricData', JSON.stringify({
-      credentialId: Array.from(new Uint8Array(credential.rawId)),
-      encryptedMasterPass
+      credentialId,
+      encryptedData
     }));
 
     return true;
@@ -58,7 +135,10 @@ export async function verifyBiometric() {
 
     if (credential) {
       // Decrypt and return master password
-      return decryptFromStorage(storedData.encryptedMasterPass);
+      return decryptFromStorage(
+        storedData.encryptedData,
+        storedData.credentialId.join(',')
+      );
     }
   } catch (error) {
     console.error('Biometric verification failed:', error);
