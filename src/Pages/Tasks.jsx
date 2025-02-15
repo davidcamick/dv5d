@@ -5,10 +5,12 @@ import {
   PlusIcon, PencilSquareIcon as PencilIcon,
   CalendarDaysIcon as CalendarIcon, TagIcon,
   ChevronDownIcon, ChevronUpIcon, CheckIcon,
-  ArrowUpIcon, ArrowDownIcon, ArrowPathIcon
+  ArrowUpIcon, ArrowDownIcon, ArrowPathIcon,
+  ArrowLeftIcon
 } from '@heroicons/react/24/outline';
 import { AnimatedGridPattern } from '../components/ui/AnimatedGridPattern';
 import { AuroraText } from '../components/ui/AuroraText';
+import { Link } from 'react-router-dom';
 
 const WORKER_URL = 'https://dv5d-tasks.accounts-abd.workers.dev';
 const MAX_RETRIES = 3;
@@ -380,7 +382,7 @@ export default function Tasks() {
   // Update document title when tasks change
   useEffect(() => {
     const upcomingCount = getUpcomingTaskCount();
-    document.title = upcomingCount > 0 ? `dv5d - ${upcomingCount}` : 'dv5d';
+    document.title = upcomingCount > 0 ? `Tasks (${upcomingCount})` : 'Tasks';
   }, [tasks]);
 
   useEffect(() => {
@@ -527,21 +529,27 @@ export default function Tasks() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-900 to-gray-900 relative overflow-hidden">
       <AnimatedGridPattern 
-        className="absolute inset-0 z-0 opacity-50"
+        className="absolute inset-0 z-0 opacity-30"
         width={32}
         height={32}
         numSquares={75}
-        maxOpacity={0.15}
+        maxOpacity={0.1}
         duration={3}
       />
       <div className="container mx-auto px-4 py-8 relative z-10">
-        {/* Header with new animation classes */}
-        <div className={`flex justify-between items-center mb-8 ${pageMount ? 'animate-fadeIn' : ''}`}>
+        <div className="flex items-center gap-4 mb-8">
+          <Link
+            to="/"
+            className="p-2 text-gray-400 hover:text-white rounded-lg hover:bg-gray-700/50 transition-all"
+          >
+            <ArrowLeftIcon className="w-5 h-5" />
+          </Link>
           <AuroraText as="h1" className="text-3xl font-bold">
-            Welcome, Sir Camick
+            Your Tasks
           </AuroraText>
+          <div className="flex-1"></div>
           <button
             onClick={() => openEditor()}
             className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
