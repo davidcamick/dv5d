@@ -155,3 +155,40 @@
   background: theme('colors.gray.900');
   transition: all 0.2s ease;
 }
+
+html {
+  background: theme('colors.gray.900');
+  min-height: 100%;
+  overscroll-behavior: none;
+}
+
+body {
+  background: linear-gradient(to bottom, 
+    theme('colors.gray.900'), 
+    theme('colors.gray.800')
+  );
+  min-height: 100vh;
+  overscroll-behavior: none;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* Optional: Add this if you want a subtle animated gradient background */
+@keyframes gradientMove {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+body {
+  background: linear-gradient(
+    45deg,
+    theme('colors.gray.900'),
+    theme('colors.gray.800'),
+    theme('colors.gray.900')
+  );
+  background-size: 200% 200%;
+  animation: gradientMove 10s ease infinite;
+}
