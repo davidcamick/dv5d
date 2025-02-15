@@ -49,9 +49,11 @@ export default {
       });
     }
 
-    const url = new URL(request.url);
-
     try {
+      const url = new URL(request.url);
+      const pathname = url.pathname.replace(/^\/+/, ''); // Remove leading slashes
+      const parts = pathname.split('/').filter(Boolean);
+
       switch (request.method) {
         case 'GET':
           // List all tasks by getting all KV keys and their values
@@ -105,10 +107,17 @@ export default {
           });
 
         case 'PUT':
+          const taskId = parts[0];
+          if (!taskId) {
+            return new Response('Task ID required', { 
+              status: 400, 
+              headers: corsHeaders 
+            });
+          }
+
           const taskToUpdate: Task = await request.json();
-          const updateId = url.pathname.split('/').pop();
+          const existingTask = await env.TASKS_KV.get(taskId);
           
-          const existingTask = await env.TASKS_KV.get(updateId);
           if (!existingTask) {
             return new Response('Task not found', { 
               status: 404, 
@@ -118,11 +127,11 @@ export default {
 
           const updatedTask = {
             ...taskToUpdate,
-            id: updateId,
+            id: taskId,
             createdAt: JSON.parse(existingTask).createdAt
           };
 
-          await env.TASKS_KV.put(updateId, JSON.stringify(updatedTask));
+          await env.TASKS_KV.put(taskId, JSON.stringify(updatedTask));
 
           return new Response(JSON.stringify(updatedTask), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },

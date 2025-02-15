@@ -150,8 +150,10 @@ export default function Tasks() {
       setPendingChanges(true);
 
       // Background save
+      const url = taskData.id ? `${WORKER_URL}/${taskData.id}` : WORKER_URL;
       const method = taskData.id ? 'PUT' : 'POST';
-      const response = await fetch(WORKER_URL + (taskData.id ? `/${taskData.id}` : ''), {
+      
+      const response = await fetch(url, {
         method,
         headers: {
           'Content-Type': 'application/json'
