@@ -24,6 +24,7 @@ export default function Tasks() {
   const [pendingChanges, setPendingChanges] = useState(false);
   const [localUpdates, setLocalUpdates] = useState(new Map()); // Track pending updates
   const [taskStatuses, setTaskStatuses] = useState(new Map());
+  const [localTasks, setLocalTasks] = useState(new Map()); // Tasks waiting for server confirmation
 
   // Get unique tags from all tasks
   const availableTags = useMemo(() => {
@@ -101,15 +102,32 @@ export default function Tasks() {
     try {
       const response = await fetch(WORKER_URL);
       if (!response.ok) throw new Error('Failed to fetch');
-      const data = await response.json();
+      const serverTasks = await response.json();
       
-      // Merge server data with pending local updates
-      const mergedTasks = data.map(task => {
-        const localUpdate = localUpdates.get(task.id);
-        return localUpdate || task;
+      // Check if any of our local tasks are now on the server
+      const confirmedTaskIds = new Set(serverTasks.map(t => t.id));
+      
+      // Remove tasks from localTasks that are now confirmed on server
+      setLocalTasks(prev => {
+        const next = new Map(prev);
+        for (const id of confirmedTaskIds) {
+          if (next.has(id)) {
+            next.delete(id);
+            // Show green dot briefly
+            setTaskStatuses(prev => new Map(prev).set(id, 'synced'));
+            setTimeout(() => {
+              setTaskStatuses(prev => {
+                const next = new Map(prev);
+                next.delete(id);
+                return next;
+              });
+            }, 3000); // Show green dot for 3 seconds
+          }
+        }
+        return next;
       });
 
-      setTasks(mergedTasks);
+      setTasks(serverTasks);
     } catch (error) {
       console.error('Error fetching tasks:', error);
     }
@@ -138,11 +156,13 @@ export default function Tasks() {
         createdAt: isNewTask ? Date.now() : taskData.createdAt
       };
 
-      // Set pending status
-      setTaskStatuses(prev => new Map(prev).set(newId, 'pending'));
+      // Add to local tasks and show pending status
+      if (isNewTask) {
+        setLocalTasks(prev => new Map(prev).set(newId, fullTaskData));
+        setTaskStatuses(prev => new Map(prev).set(newId, 'pending'));
+      }
 
       // Optimistic update
-      setLocalUpdates(prev => new Map(prev).set(newId, fullTaskData));
       setTasks(prev => {
         if (isNewTask) return [...prev, fullTaskData];
         return prev.map(t => t.id === newId ? fullTaskData : t);
@@ -168,27 +188,11 @@ export default function Tasks() {
         throw new Error('Failed to save task');
       }
 
-      // Update status to synced after successful save
-      setTaskStatuses(prev => new Map(prev).set(newId, 'synced'));
-
-      // After 5 seconds, remove the status indicator
-      setTimeout(() => {
-        setTaskStatuses(prev => {
-          const next = new Map(prev);
-          next.delete(newId);
-          return next;
-        });
-      }, 5000);
-
-      // Remove from local updates after successful save
-      setLocalUpdates(prev => {
-        const next = new Map(prev);
-        next.delete(newId);
-        return next;
-      });
+      // Server will confirm through polling
     } catch (error) {
       console.error('Error saving task:', error);
-      // Keep status as pending on error
+      // Keep the task in local state even if save fails
+      // User can try again or task will sync when connection restored
     }
   };
 
@@ -349,6 +353,16 @@ export default function Tasks() {
     document.title = upcomingCount > 0 ? `dv5d - ${upcomingCount}` : 'dv5d';
   }, [tasks]);
 
+  // Modify task rendering to show status dot based on whether task is local or confirmed
+  const getTaskStatus = (taskId) => {
+    // If task is in localTasks, it's pending server confirmation
+    if (localTasks.has(taskId)) {
+      return 'pending';
+    }
+    // Otherwise use the regular status (for showing brief 'synced' state)
+    return taskStatuses.get(taskId);
+  };
+
   if (loading) {
     return <div className="text-center py-8">Loading tasks...</div>;
   }
@@ -435,7 +449,7 @@ export default function Tasks() {
                 <div className="flex items-start gap-4">
                   {/* Add status dot */}
                   <div className="mt-2">
-                    <StatusDot status={taskStatuses.get(task.id)} />
+                    <StatusDot status={getTaskStatus(task.id)} />
                   </div>
                   <button
                     onClick={() => handleTaskCompletion(task)}
@@ -548,7 +562,7 @@ export default function Tasks() {
                     <div className="flex items-start gap-4">
                       {/* Add status dot */}
                       <div className="mt-2">
-                        <StatusDot status={taskStatuses.get(task.id)} />
+                        <StatusDot status={getTaskStatus(task.id)} />
                       </div>
                       <button
                         onClick={() => handleTaskCompletion(task)}
