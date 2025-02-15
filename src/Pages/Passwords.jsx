@@ -67,8 +67,24 @@ export default function Passwords() {
     setToast({ message, type });
   };
 
+  const checkBiometricData = () => {
+    const storedData = localStorage.getItem('biometricData');
+    return storedData ? JSON.parse(storedData) : null;
+  };
+
   const handleBiometricSetup = async () => {
     try {
+      if (!masterPassword) {
+        showToast('Please unlock the password manager first', 'warning');
+        return;
+      }
+
+      const existingData = checkBiometricData();
+      if (existingData) {
+        const confirmed = window.confirm('Biometric data already exists. Do you want to reset it?');
+        if (!confirmed) return;
+      }
+
       console.log('Starting biometric setup...');
       const result = await registerBiometric(masterPassword);
       console.log('Biometric setup result:', result);
@@ -81,11 +97,19 @@ export default function Passwords() {
 
   const handleBiometricUnlock = async () => {
     try {
+      const existingData = checkBiometricData();
+      if (!existingData) {
+        showToast('Please set up biometric authentication first', 'warning');
+        return;
+      }
+
       const storedPassword = await verifyBiometric();
       setMasterPassword(storedPassword);
-      handleUnlock();
+      await handleUnlock();
     } catch (error) {
-      setError('Biometric authentication failed');
+      console.error('Biometric unlock error:', error);
+      setError(error.message || 'Biometric authentication failed');
+      showToast('Biometric authentication failed. Please use your master password.', 'error');
     }
   };
 
@@ -209,12 +233,20 @@ export default function Passwords() {
               </form>
 
               {isBiometricAvailable && (
-                <button
-                  onClick={handleBiometricUnlock}
-                  className="w-full px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600"
-                >
-                  Unlock with Biometrics
-                </button>
+                <div>
+                  <button
+                    onClick={handleBiometricUnlock}
+                    className="w-full px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 flex items-center justify-center gap-2"
+                  >
+                    <KeyIcon className="w-5 h-5" />
+                    {checkBiometricData() ? 'Unlock with Biometrics' : 'Biometrics Not Set Up'}
+                  </button>
+                  {!checkBiometricData() && (
+                    <p className="text-gray-400 text-xs text-center mt-2">
+                      Unlock with password first to set up biometrics
+                    </p>
+                  )}
+                </div>
               )}
 
               {error && (
