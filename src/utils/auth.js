@@ -1,4 +1,4 @@
-const ALLOWED_EMAILS = ['your.email@gmail.com']; // Add your allowed emails here
+const ALLOWED_EMAILS = ['davidpaulcamick@gmail.com']; // Updated allowed emails
 
 export const initializeGoogleAuth = () => {
   const script = document.createElement('script');
