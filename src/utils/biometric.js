@@ -72,30 +72,47 @@ async function decryptFromStorage(encryptedData, key) {
 
 export async function registerBiometric(masterPassword) {
   try {
+    // Create a random challenge
+    const challenge = crypto.getRandomValues(new Uint8Array(32));
+    
+    // Create random user ID
+    const userId = crypto.getRandomValues(new Uint8Array(16));
+
     const publicKeyCredentialCreationOptions = {
-      challenge: new Uint8Array(32),
+      challenge,
       rp: {
-        name: "DV5D Password Manager",
-        id: window.location.hostname
+        // Use only the domain part, not the full hostname
+        name: "Password Manager",
+        id: window.location.hostname.split(':')[0]
       },
       user: {
-        id: new Uint8Array(16),
-        name: "user@example.com",
-        displayName: "DV5D User"
+        id: userId,
+        name: "passwordmanager@local",
+        displayName: "Password Manager User"
       },
-      pubKeyCredParams: [{
-        type: "public-key",
-        alg: -7
-      }],
+      pubKeyCredParams: [
+        { type: "public-key", alg: -7 }, // ES256
+        { type: "public-key", alg: -257 } // RS256
+      ],
+      timeout: 60000,
       authenticatorSelection: {
         authenticatorAttachment: "platform",
-        userVerification: "required"
+        requireResidentKey: false,
+        userVerification: "preferred"
       }
     };
+
+    console.log('Requesting credential creation with options:', publicKeyCredentialCreationOptions);
 
     const credential = await navigator.credentials.create({
       publicKey: publicKeyCredentialCreationOptions
     });
+
+    if (!credential) {
+      throw new Error('No credential returned');
+    }
+
+    console.log('Credential created successfully:', credential);
 
     // Store encrypted master password with credential ID
     const credentialId = Array.from(new Uint8Array(credential.rawId));
@@ -104,14 +121,19 @@ export async function registerBiometric(masterPassword) {
       credentialId.join(',')
     );
     
-    localStorage.setItem('biometricData', JSON.stringify({
+    const dataToStore = {
       credentialId,
-      encryptedData
-    }));
+      encryptedData,
+      // Store additional info that might be needed for verification
+      rpId: window.location.hostname.split(':')[0]
+    };
+
+    localStorage.setItem('biometricData', JSON.stringify(dataToStore));
+    console.log('Biometric data stored successfully');
 
     return true;
   } catch (error) {
-    console.error('Biometric registration failed:', error);
+    console.error('Detailed biometric registration error:', error);
     throw error;
   }
 }
