@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { getUserEmail } from '../utils/auth';
 
-const WORKER_URL = 'YOUR_WORKER_URL'; // Add your worker URL
+const WORKER_URL = 'https://dv5d-tasks.davidpaulcamick.workers.dev'; // Update this after deployment
 
 export default function Tasks() {
   const [tasks, setTasks] = useState([]);
