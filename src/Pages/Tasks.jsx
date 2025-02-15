@@ -529,27 +529,29 @@ export default function Tasks() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-900 to-gray-900 relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 relative overflow-hidden">
       <AnimatedGridPattern 
-        className="absolute inset-0 z-0 opacity-30"
+        className="absolute inset-0 z-0 opacity-50"
         width={32}
         height={32}
         numSquares={75}
-        maxOpacity={0.1}
+        maxOpacity={0.15}
         duration={3}
       />
       <div className="container mx-auto px-4 py-8 relative z-10">
-        <div className="flex items-center gap-4 mb-8">
-          <Link
-            to="/"
-            className="p-2 text-gray-400 hover:text-white rounded-lg hover:bg-gray-700/50 transition-all"
-          >
-            <ArrowLeftIcon className="w-5 h-5" />
-          </Link>
-          <AuroraText as="h1" className="text-3xl font-bold">
-            Your Tasks
-          </AuroraText>
-          <div className="flex-1"></div>
+        {/* Header */}
+        <div className={`flex justify-between items-center mb-8 ${pageMount ? 'animate-fadeIn' : ''}`}>
+          <div className="flex items-center gap-4">
+            <Link
+              to="/"
+              className="p-2 text-gray-400 hover:text-white rounded-lg hover:bg-gray-700/50 transition-all"
+            >
+              <ArrowLeftIcon className="w-5 h-5" />
+            </Link>
+            <AuroraText as="h1" className="text-3xl font-bold">
+              Your Tasks
+            </AuroraText>
+          </div>
           <button
             onClick={() => openEditor()}
             className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
@@ -558,8 +560,8 @@ export default function Tasks() {
           </button>
         </div>
 
-        {/* Controls with new animation classes */}
-        <div className={`flex gap-4 mb-4 ${pageMount ? 'animate-fadeIn delay-200' : ''}`}>
+        {/* Controls */}
+        <div className={`flex flex-wrap gap-4 mb-4 ${pageMount ? 'animate-fadeIn delay-200' : ''}`}>
           <button
             onClick={handleManualRefresh}
             className={`p-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-700/50 transition-all
@@ -600,7 +602,7 @@ export default function Tasks() {
           </button>
         </div>
 
-        {/* Tags with new animation classes */}
+        {/* Tags section */}
         {availableTags.length > 0 && (
           <div className={`mb-6 flex flex-wrap gap-2 ${pageMount ? 'animate-fadeIn delay-300' : ''}`}>
             {availableTags.map(tag => (
@@ -619,7 +621,7 @@ export default function Tasks() {
           </div>
         )}
 
-        {/* Active tasks with staggered animation */}
+        {/* Active tasks */}
         <div className="space-y-4 mb-8 transition-all">
           {activeTasks.map((task, index) => (
             <TaskItem 
@@ -635,28 +637,31 @@ export default function Tasks() {
           )}
         </div>
 
-        {/* Completed tasks section with fade-in */}
+        {/* Completed tasks section */}
         {completedTasks.length > 0 && (
-          <div className="mt-8 border-t border-gray-700 pt-4 fade-in" style={{ animationDelay: '0.5s' }}>
-            <button
-              onClick={() => setShowCompleted(prev => !prev)}
-              className="flex items-center gap-2 text-gray-400 hover:text-white w-full"
-            >
-              {showCompleted ? <ChevronUpIcon className="w-5 h-5" /> : <ChevronDownIcon className="w-5 h-5" />}
-              <span>Completed Tasks ({completedTasks.length})</span>
-            </button>
+          <>
+            <div className="border-t border-gray-700/50 my-8" />
+            <div className="flex justify-center">
+              <button
+                onClick={() => setShowCompleted(prev => !prev)}
+                className="flex items-center gap-2 text-gray-400 hover:text-white"
+              >
+                {showCompleted ? <ChevronUpIcon className="w-5 h-5" /> : <ChevronDownIcon className="w-5 h-5" />}
+                <span>Completed Tasks ({completedTasks.length})</span>
+              </button>
+            </div>
 
             {showCompleted && (
-              <div className="space-y-4 mt-4 opacity-75">
+              <div className="mt-4 space-y-4 opacity-75">
                 {completedTasks.map((task) => (
                   <TaskItem key={task.id} task={task} />
                 ))}
               </div>
             )}
-          </div>
+          </>
         )}
 
-        {/* Add undo button for recently deleted tasks */}
+        {/* Rest of the components (undo, editor, error) remain unchanged */}
         {deletedTasks.size > 0 && (
           <div className="fixed bottom-4 right-4">
             <div className="bg-gray-800/90 p-4 rounded-lg shadow-lg flex items-center gap-4">

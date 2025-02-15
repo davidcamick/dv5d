@@ -123,3 +123,35 @@
 .stagger-children > *:nth-child(4) { animation-delay: 0.4s; }
 .stagger-children > *:nth-child(5) { animation-delay: 0.5s; }
 .stagger-children > *:nth-child(n+6) { animation-delay: 0.6s; }
+
+/* Add these styles for the completed tasks section */
+.completed-tasks-divider {
+  position: relative;
+  width: 100%;
+  max-width: 2xl;
+  margin: 2rem auto;
+}
+
+.completed-tasks-divider::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: theme('colors.gray.700');
+  opacity: 0.5;
+}
+
+.completed-tasks-button {
+  position: relative;
+  z-index: 1;
+  padding: 0.5rem 1rem;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background: theme('colors.gray.900');
+  transition: all 0.2s ease;
+}
