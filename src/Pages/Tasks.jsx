@@ -104,30 +104,40 @@ export default function Tasks() {
       if (!response.ok) throw new Error('Failed to fetch');
       const serverTasks = await response.json();
       
-      // Check if any of our local tasks are now on the server
-      const confirmedTaskIds = new Set(serverTasks.map(t => t.id));
+      // Check which tasks are confirmed on server
+      const serverTaskIds = new Set(serverTasks.map(t => t.id));
       
-      // Remove tasks from localTasks that are now confirmed on server
-      setLocalTasks(prev => {
-        const next = new Map(prev);
-        for (const id of confirmedTaskIds) {
-          if (next.has(id)) {
+      // Merge server tasks with local tasks
+      const mergedTasks = [
+        ...serverTasks,
+        // Keep local tasks that aren't on server yet
+        ...Array.from(localTasks.values())
+          .filter(task => !serverTaskIds.has(task.id))
+      ];
+
+      // Update task statuses
+      serverTaskIds.forEach(id => {
+        if (localTasks.has(id)) {
+          // Task has been confirmed by server
+          setTaskStatuses(prev => new Map(prev).set(id, 'synced'));
+          setTimeout(() => {
+            setTaskStatuses(prev => {
+              const next = new Map(prev);
+              next.delete(id);
+              return next;
+            });
+          }, 3000);
+          
+          // Remove from local tasks
+          setLocalTasks(prev => {
+            const next = new Map(prev);
             next.delete(id);
-            // Show green dot briefly
-            setTaskStatuses(prev => new Map(prev).set(id, 'synced'));
-            setTimeout(() => {
-              setTaskStatuses(prev => {
-                const next = new Map(prev);
-                next.delete(id);
-                return next;
-              });
-            }, 3000); // Show green dot for 3 seconds
-          }
+            return next;
+          });
         }
-        return next;
       });
 
-      setTasks(serverTasks);
+      setTasks(mergedTasks);
     } catch (error) {
       console.error('Error fetching tasks:', error);
     }
