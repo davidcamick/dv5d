@@ -59,24 +59,20 @@ export default function Passwords() {
     }
   };
 
+  const handleBiometricSetup = async () => {
+    try {
+      await registerBiometric(masterPassword);
+      setError('Biometric authentication setup complete');
+    } catch (error) {
+      setError('Failed to setup biometric authentication');
+    }
+  };
+
   const handleBiometricUnlock = async () => {
     try {
-      // Request biometric authentication
-      const credential = await navigator.credentials.get({
-        publicKey: {
-          challenge: new Uint8Array(32),
-          rpId: window.location.hostname,
-          userVerification: "required",
-        }
-      });
-
-      if (credential) {
-        // Retrieve the stored master password using the credential
-        // This is a simplified example - you'd need to implement proper key management
-        const storedPassword = await retrieveStoredMasterPassword(credential);
-        setMasterPassword(storedPassword);
-        handleUnlock();
-      }
+      const storedPassword = await verifyBiometric();
+      setMasterPassword(storedPassword);
+      handleUnlock();
     } catch (error) {
       setError('Biometric authentication failed');
     }
@@ -311,6 +307,15 @@ export default function Passwords() {
             setEditingPassword(null);
           }}
         />
+      )}
+
+      {!isLocked && (
+        <button
+          onClick={handleBiometricSetup}
+          className="mt-4 px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600"
+        >
+          Setup Biometric Unlock
+        </button>
       )}
 
       {error && (
