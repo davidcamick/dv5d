@@ -1,3 +1,5 @@
+import { fetchLinkPreview } from './link-preview';
+
 interface Env {
   TASKS_KV: KVNamespace;
 }
@@ -15,10 +17,10 @@ interface Task {
   text: string;
   completed: boolean;
   createdAt: number;
-  dueDate?: number;
-  tags: string[];
-  color?: string;
-  links: {
+  dueDate?: number;        // ✅ Handles calendar dates
+  tags: string[];          // ✅ Handles tags
+  color?: string;          // ✅ Handles color coding
+  links: {                 // ✅ Handles links with previews
     url: string;
     preview?: {
       title: string;
@@ -26,8 +28,8 @@ interface Task {
       image: string;
     }
   }[];
-  priority: 'low' | 'medium' | 'high';
-  notes?: string;
+  priority: 'low' | 'medium' | 'high';  // ✅ Handles priority levels
+  notes?: string;         // ✅ Handles additional notes
 }
 
 export default {
@@ -72,6 +74,14 @@ export default {
           });
 
         case 'POST':
+          if (url.pathname.endsWith('/preview')) {
+            const { url: previewUrl } = await request.json();
+            const preview = await fetchLinkPreview(previewUrl);
+            return new Response(JSON.stringify(preview), {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+          }
+
           if (url.pathname.endsWith('/lists')) {
             const list: TaskList = await request.json();
             const existingLists: TaskList[] = JSON.parse(
@@ -86,6 +96,21 @@ export default {
             });
           }
           const task: Task = await request.json();
+
+          // Fetch previews for any new links
+          if (task.links) {
+            const previews = await Promise.all(
+              task.links.map(async (link) => {
+                if (!link.preview) {
+                  const preview = await fetchLinkPreview(link.url);
+                  return { ...link, preview };
+                }
+                return link;
+              })
+            );
+            task.links = previews;
+          }
+
           const existingTasks: Task[] = JSON.parse(
             (await env.TASKS_KV.get(`tasks:${userEmail}`)) || '[]'
           );

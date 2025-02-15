@@ -28,14 +28,39 @@ export default function TaskEditor({ task, onSave, onClose }) {
     }
   };
 
-  const addLink = (e) => {
+  const addLink = async (e) => {
     e.preventDefault();
     if (newLink.trim()) {
-      setEditedTask(prev => ({
-        ...prev,
-        links: [...(prev.links || []), { url: newLink.trim() }]
-      }));
-      setNewLink('');
+      try {
+        // Fetch preview when adding a link
+        const response = await fetch(`${WORKER_URL}/preview`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-User-Email': getUserEmail()
+          },
+          body: JSON.stringify({ url: newLink.trim() })
+        });
+        
+        const preview = await response.json();
+        
+        setEditedTask(prev => ({
+          ...prev,
+          links: [...(prev.links || []), { 
+            url: newLink.trim(),
+            preview
+          }]
+        }));
+        setNewLink('');
+      } catch (error) {
+        console.error('Error fetching preview:', error);
+        // Add link without preview if fetch fails
+        setEditedTask(prev => ({
+          ...prev,
+          links: [...(prev.links || []), { url: newLink.trim() }]
+        }));
+        setNewLink('');
+      }
     }
   };
 
