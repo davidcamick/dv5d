@@ -12,12 +12,13 @@ const WORKER_URL = 'https://dv5d-tasks.accounts-abd.workers.dev';
 
 export default function Tasks() {
   const [tasks, setTasks] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
   const [showCompleted, setShowCompleted] = useState(false);
   const [selectedTags, setSelectedTags] = useState([]);
   const [sortConfig, setSortConfig] = useState({ field: null, direction: null });
+  const [deletedTasks, setDeletedTasks] = useState(new Map()); // Track deleted tasks for undo
+  const [undoTimers, setUndoTimers] = useState(new Map()); // Track undo timers
 
   // Get unique tags from all tasks
   const availableTags = useMemo(() => {
@@ -83,7 +84,6 @@ export default function Tasks() {
 
   const fetchTasks = async () => {
     try {
-      console.log('Fetching tasks...');
       const response = await fetch(WORKER_URL, {
         headers: { 
           'Accept': 'application/json'
@@ -91,16 +91,54 @@ export default function Tasks() {
       });
       if (!response.ok) throw new Error('Failed to fetch');
       const data = await response.json();
-      setTasks(data);
+      // Only update if data has changed
+      if (JSON.stringify(data) !== JSON.stringify(tasks)) {
+        setTasks(data);
+      }
     } catch (error) {
       console.error('Error fetching tasks:', error);
-    } finally {
-      setLoading(false);
     }
   };
 
+  // Add polling effect
+  useEffect(() => {
+    // Initial fetch
+    fetchTasks();
+
+    // Set up polling every 1 second
+    const intervalId = setInterval(fetchTasks, 1000);
+
+    // Cleanup on unmount
+    return () => clearInterval(intervalId);
+  }, []); // Empty dependency array since fetchTasks is stable
+
+  // Remove the loading state since we'll always be updating
+  const [loading, setLoading] = useState(false);
+
+  // Modify handleSaveTask to be optimistic
   const handleSaveTask = async (taskData) => {
     try {
+      // Optimistically update the UI
+      if (taskData.id) {
+        // Update existing task
+        setTasks(prev => prev.map(t => 
+          t.id === taskData.id ? taskData : t
+        ));
+      } else {
+        // Add new task
+        const newTask = {
+          ...taskData,
+          id: crypto.randomUUID(), // Generate temporary ID
+          createdAt: Date.now()
+        };
+        setTasks(prev => [...prev, newTask]);
+      }
+
+      // Close the editor immediately
+      setIsEditorOpen(false);
+      setEditingTask(null);
+
+      // Then send to server
       const method = taskData.id ? 'PUT' : 'POST';
       const response = await fetch(WORKER_URL + (taskData.id ? `/${taskData.id}` : ''), {
         method,
@@ -109,29 +147,96 @@ export default function Tasks() {
         },
         body: JSON.stringify(taskData)
       });
+      
       if (!response.ok) throw new Error('Failed to save task');
-      fetchTasks();
-      setIsEditorOpen(false);
-      setEditingTask(null);
+      
+      // Server update will be caught by polling
     } catch (error) {
       console.error('Error saving task:', error);
+      // Could add error state handling here if needed
     }
   };
 
+  // Modify deleteTask to support undo
   const deleteTask = async (id) => {
     try {
-      const response = await fetch(`${WORKER_URL}/${id}`, {
-        method: 'DELETE'
-      });
-      if (!response.ok) throw new Error('Failed to delete task');
-      fetchTasks();
+      // Store the task for potential undo
+      const taskToDelete = tasks.find(t => t.id === id);
+      setDeletedTasks(prev => new Map(prev).set(id, taskToDelete));
+      
+      // Optimistically remove from UI
+      setTasks(prev => prev.filter(t => t.id !== id));
+
+      // Set up timer for actual deletion
+      const timerId = setTimeout(async () => {
+        try {
+          const response = await fetch(`${WORKER_URL}/${id}`, {
+            method: 'DELETE'
+          });
+          
+          if (!response.ok) throw new Error('Failed to delete task');
+          
+          // Clean up undo state
+          setDeletedTasks(prev => {
+            const newMap = new Map(prev);
+            newMap.delete(id);
+            return newMap;
+          });
+        } catch (error) {
+          console.error('Error deleting task:', error);
+        }
+      }, 10000); // 10 second delay
+
+      // Store timer ID for cleanup
+      setUndoTimers(prev => new Map(prev).set(id, timerId));
+
+      // Show toast notification
+      // You might want to add a toast library like react-hot-toast
+      alert('Task deleted. You have 10 seconds to undo.');
     } catch (error) {
       console.error('Error deleting task:', error);
     }
   };
 
+  // Add undo function
+  const undoDelete = (id) => {
+    // Clear the deletion timer
+    clearTimeout(undoTimers.get(id));
+    setUndoTimers(prev => {
+      const newMap = new Map(prev);
+      newMap.delete(id);
+      return newMap;
+    });
+
+    // Restore the task
+    const taskToRestore = deletedTasks.get(id);
+    if (taskToRestore) {
+      setTasks(prev => [...prev, taskToRestore]);
+      setDeletedTasks(prev => {
+        const newMap = new Map(prev);
+        newMap.delete(id);
+        return newMap;
+      });
+    }
+  };
+
+  // Clean up timers on unmount
+  useEffect(() => {
+    return () => {
+      undoTimers.forEach(timerId => clearTimeout(timerId));
+    };
+  }, [undoTimers]);
+
   const openEditor = (task = null) => {
-    setEditingTask(task);
+    setEditingTask(task ? task : { 
+      text: '',
+      dueDate: null,
+      priority: 'medium',
+      tags: [],
+      links: [],
+      color: '#ffffff', // Set default color to white
+      notes: ''
+    });
     setIsEditorOpen(true);
   };
 
@@ -165,10 +270,6 @@ export default function Tasks() {
   };
 
   useEffect(() => {
-    fetchTasks();
-  }, []);
-
-  useEffect(() => {
     const handleKeyPress = (e) => {
       if (e.key === 'Enter' && !isEditorOpen) {
         e.preventDefault();
@@ -180,6 +281,22 @@ export default function Tasks() {
     return () => document.removeEventListener('keydown', handleKeyPress);
   }, [isEditorOpen]);
 
+  // Add function to count upcoming tasks
+  const getUpcomingTaskCount = () => {
+    const twoDaysFromNow = Date.now() + (2 * 24 * 60 * 60 * 1000);
+    return tasks.filter(task => 
+      !task.completed && 
+      task.dueDate && 
+      task.dueDate <= twoDaysFromNow
+    ).length;
+  };
+
+  // Update document title when tasks change
+  useEffect(() => {
+    const upcomingCount = getUpcomingTaskCount();
+    document.title = upcomingCount > 0 ? `dv5d - ${upcomingCount}` : 'dv5d';
+  }, [tasks]);
+
   if (loading) {
     return <div className="text-center py-8">Loading tasks...</div>;
   }
@@ -187,8 +304,9 @@ export default function Tasks() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
       <div className="container mx-auto px-4 py-8">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold text-white">My Tasks</h1>
+        {/* Header with fade-in */}
+        <div className="flex justify-between items-center mb-8 fade-in" style={{ animationDelay: '0.1s' }}>
+          <h1 className="text-3xl font-bold text-white">Welcome, Sir Camick</h1>
           <button
             onClick={() => openEditor()}
             className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center gap-2"
@@ -198,42 +316,42 @@ export default function Tasks() {
           </button>
         </div>
 
-        {/* Sort controls */}
-        <div className="flex gap-4 mb-4">
+        {/* Sort controls with fade-in */}
+        <div className="flex gap-4 mb-4 fade-in" style={{ animationDelay: '0.2s' }}>
           <button
             onClick={() => handleSort('date')}
             className={`px-3 py-1 rounded-lg flex items-center gap-1 ${
-              sortConfig.field === 'date'
+              sortConfig.field === 'date' && sortConfig.direction
                 ? 'bg-blue-500 text-white'
                 : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
             }`}
           >
             Sort by Date
-            {sortConfig.field === 'date' && (
+            {sortConfig.field === 'date' && sortConfig.direction && (
               sortConfig.direction === 'asc' ? <ArrowUpIcon className="w-4 h-4" /> :
-              sortConfig.direction === 'desc' ? <ArrowDownIcon className="w-4 h-4" /> : null
+              <ArrowDownIcon className="w-4 h-4" />
             )}
           </button>
           
           <button
             onClick={() => handleSort('priority')}
             className={`px-3 py-1 rounded-lg flex items-center gap-1 ${
-              sortConfig.field === 'priority'
+              sortConfig.field === 'priority' && sortConfig.direction
                 ? 'bg-blue-500 text-white'
                 : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
             }`}
           >
             Sort by Priority
-            {sortConfig.field === 'priority' && (
+            {sortConfig.field === 'priority' && sortConfig.direction && (
               sortConfig.direction === 'asc' ? <ArrowUpIcon className="w-4 h-4" /> :
-              sortConfig.direction === 'desc' ? <ArrowDownIcon className="w-4 h-4" /> : null
+              <ArrowDownIcon className="w-4 h-4" />
             )}
           </button>
         </div>
 
-        {/* Tag filters */}
+        {/* Tag filters with fade-in */}
         {availableTags.length > 0 && (
-          <div className="mb-6 flex flex-wrap gap-2">
+          <div className="mb-6 flex flex-wrap gap-2 fade-in" style={{ animationDelay: '0.3s' }}>
             {availableTags.map(tag => (
               <button
                 key={tag}
@@ -250,10 +368,14 @@ export default function Tasks() {
           </div>
         )}
 
-        {/* Active tasks */}
-        <div className="space-y-4 mb-8 transition-all">
-          {activeTasks.map((task) => (
-            <div key={task.id} className="task-item-container">
+        {/* Active tasks with staggered animation */}
+        <div className="space-y-4 mb-8 transition-all stagger-children">
+          {activeTasks.map((task, index) => (
+            <div 
+              key={task.id} 
+              className="task-item-container"
+              style={{ animationDelay: `${0.4 + (index * 0.1)}s` }}
+            >
               <div
                 id={`task-${task.id}`}
                 className="bg-gray-800/50 rounded-lg p-4 shadow-lg hover:bg-gray-800/70 transition-all task-item"
@@ -352,9 +474,9 @@ export default function Tasks() {
           )}
         </div>
 
-        {/* Completed tasks section */}
+        {/* Completed tasks section with fade-in */}
         {completedTasks.length > 0 && (
-          <div className="mt-8 border-t border-gray-700 pt-4">
+          <div className="mt-8 border-t border-gray-700 pt-4 fade-in" style={{ animationDelay: '0.5s' }}>
             <button
               onClick={() => setShowCompleted(prev => !prev)}
               className="flex items-center gap-2 text-gray-400 hover:text-white w-full"
@@ -455,6 +577,23 @@ export default function Tasks() {
                 ))}
               </div>
             )}
+          </div>
+        )}
+
+        {/* Add undo button for recently deleted tasks */}
+        {deletedTasks.size > 0 && (
+          <div className="fixed bottom-4 right-4 space-y-2">
+            {Array.from(deletedTasks).map(([id, task]) => (
+              <div key={id} className="bg-gray-800 p-4 rounded-lg shadow-lg flex items-center gap-4">
+                <span className="text-gray-300">Task deleted: {task.text}</span>
+                <button
+                  onClick={() => undoDelete(id)}
+                  className="px-3 py-1 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+                >
+                  Undo
+                </button>
+              </div>
+            ))}
           </div>
         )}
 
