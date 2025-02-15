@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import DatePicker from 'react-datepicker';
 import { CirclePicker } from 'react-color';
 import { getUserEmail } from '../../utils/auth';
@@ -19,6 +19,22 @@ export default function TaskEditor({ task, onSave, onClose }) {
 
   const [newTag, setNewTag] = useState('');
   const [newLink, setNewLink] = useState('');
+
+  // Handle Enter key press
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      onSave(editedTask);
+    }
+  };
+
+  // Focus input on mount
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      document.getElementById('task-text-input')?.focus();
+    }, 100);
+    return () => clearTimeout(timer);
+  }, []);
 
   const addTag = (e) => {
     e.preventDefault();
@@ -74,9 +90,11 @@ export default function TaskEditor({ task, onSave, onClose }) {
 
         <div className="space-y-4">
           <input
+            id="task-text-input"
             type="text"
             value={editedTask.text}
             onChange={e => setEditedTask(prev => ({ ...prev, text: e.target.value }))}
+            onKeyPress={handleKeyPress}
             className="w-full px-4 py-2 bg-gray-800 text-white rounded-lg"
             placeholder="Task description..."
           />

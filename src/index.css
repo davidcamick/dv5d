@@ -2,6 +2,16 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Hide scrollbars but keep functionality */
+* {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+*::-webkit-scrollbar {
+  display: none;
+}
+
 /* Checkbox and Task Animations */
 .custom-checkbox {
   background: transparent;
@@ -13,12 +23,22 @@
 
 .task-item {
   transform-origin: top;
-  transition: all 0.3s ease-in-out;
+  transition: all 0.3s ease-out;
 }
 
 .task-completing {
   transform: translateX(100%);
   opacity: 0;
+}
+
+/* Preserve space for completed tasks animation */
+.task-item-container {
+  min-height: 0;
+  transition: min-height 0.3s ease-out;
+}
+
+.task-item-container.completing {
+  min-height: 0 !important;
 }
 
 .task-completed .custom-checkbox {
