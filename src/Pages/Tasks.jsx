@@ -615,7 +615,7 @@ export default function Tasks() {
 
         {/* Add undo button for recently deleted tasks */}
         {deletedTasks.size > 0 && (
-          <div className="fixed bottom-4 right-4 space-y-2"></div>
+          <div className="fixed bottom-4 right-4 space-y-2">
             {Array.from(deletedTasks).map(([id, task]) => (
               <div key={id} className="bg-gray-800 p-4 rounded-lg shadow-lg flex items-center gap-4">
                 <span className="text-gray-300">Task deleted: {task.text}</span>
