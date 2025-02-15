@@ -9,8 +9,6 @@ import {
 } from '@heroicons/react/24/outline';
 import { AnimatedGridPattern } from '../components/ui/AnimatedGridPattern';
 import { AuroraText } from '../components/ui/AuroraText';
-import { BorderBeam } from '../components/ui/BorderBeam';
-import { MagicButton } from '../components/ui/MagicButton';
 
 const WORKER_URL = 'https://dv5d-tasks.accounts-abd.workers.dev';
 const MAX_RETRIES = 3;
@@ -436,13 +434,6 @@ export default function Tasks() {
           className="relative bg-gray-800/50 rounded-xl p-4 shadow-lg hover:bg-gray-800/70 transition-all group"
           onMouseEnter={handleMouseEnter}
         >
-          <BorderBeam 
-            colorFrom={task.color || '#4299E1'}
-            colorTo="#ffffff"
-            size={40}
-            duration={8}
-            isVisible={isHovered}
-          />
           <div className="relative z-10">
             {/* Existing task content */}
             <div className="flex items-start gap-4">
@@ -578,7 +569,7 @@ export default function Tasks() {
                 : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
             }`}
           >
-            Sort by Date
+            Date
             {sortConfig.field === 'date' && sortConfig.direction && (
               sortConfig.direction === 'asc' ? <ArrowUpIcon className="w-4 h-4" /> :
               <ArrowDownIcon className="w-4 h-4" />
@@ -593,7 +584,7 @@ export default function Tasks() {
                 : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
             }`}
           >
-            Sort by Priority
+            Priority
             {sortConfig.field === 'priority' && sortConfig.direction && (
               sortConfig.direction === 'asc' ? <ArrowUpIcon className="w-4 h-4" /> :
               <ArrowDownIcon className="w-4 h-4" />
