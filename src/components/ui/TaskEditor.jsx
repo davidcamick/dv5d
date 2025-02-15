@@ -1,7 +1,10 @@
 import { useState } from 'react';
 import DatePicker from 'react-datepicker';
 import { CirclePicker } from 'react-color';
+import { getUserEmail } from '../../utils/auth';
 import "react-datepicker/dist/react-datepicker.css";
+
+const WORKER_URL = 'https://dv5d-tasks.accounts-abd.workers.dev';
 
 export default function TaskEditor({ task, onSave, onClose }) {
   const [editedTask, setEditedTask] = useState(task || {

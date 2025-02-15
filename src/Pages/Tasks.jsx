@@ -1,11 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { getUserEmail } from '../utils/auth';
 import TaskEditor from '../components/ui/TaskEditor';
 import { 
-  PlusIcon,
-  PencilSquareIcon as PencilIcon,
-  CalendarDaysIcon as CalendarIcon,
-  TagIcon 
+  PlusIcon, PencilSquareIcon as PencilIcon,
+  CalendarDaysIcon as CalendarIcon, TagIcon,
+  ChevronDownIcon, ChevronUpIcon 
 } from '@heroicons/react/24/outline';
 
 const WORKER_URL = 'https://dv5d-tasks.accounts-abd.workers.dev';
@@ -15,6 +14,27 @@ export default function Tasks() {
   const [loading, setLoading] = useState(true);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
+  const [showCompleted, setShowCompleted] = useState(false);
+  const [selectedTags, setSelectedTags] = useState([]);
+
+  // Get unique tags from all tasks
+  const availableTags = useMemo(() => {
+    const tags = new Set();
+    tasks.forEach(task => {
+      task.tags?.forEach(tag => tags.add(tag));
+    });
+    return Array.from(tags);
+  }, [tasks]);
+
+  // Filter tasks based on completion and selected tags
+  const filteredTasks = useMemo(() => {
+    return tasks.filter(task => {
+      const matchesCompletion = showCompleted ? task.completed : !task.completed;
+      const matchesTags = selectedTags.length === 0 || 
+        task.tags?.some(tag => selectedTags.includes(tag));
+      return matchesCompletion && matchesTags;
+    });
+  }, [tasks, showCompleted, selectedTags]);
 
   const fetchTasks = async () => {
     try {
@@ -72,6 +92,14 @@ export default function Tasks() {
     setIsEditorOpen(true);
   };
 
+  const toggleTag = (tag) => {
+    setSelectedTags(prev => 
+      prev.includes(tag) 
+        ? prev.filter(t => t !== tag)
+        : [...prev, tag]
+    );
+  };
+
   useEffect(() => {
     fetchTasks();
   }, []);
@@ -94,8 +122,28 @@ export default function Tasks() {
           </button>
         </div>
 
-        <div className="space-y-4">
-          {tasks.map((task) => (
+        {/* Tag filters */}
+        {availableTags.length > 0 && (
+          <div className="mb-6 flex flex-wrap gap-2">
+            {availableTags.map(tag => (
+              <button
+                key={tag}
+                onClick={() => toggleTag(tag)}
+                className={`px-3 py-1 rounded-full text-sm ${
+                  selectedTags.includes(tag)
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                }`}
+              >
+                {tag}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Active tasks */}
+        <div className="space-y-4 mb-8">
+          {filteredTasks.map((task) => (
             <div
               key={task.id}
               className="bg-gray-800/50 rounded-lg p-4 shadow-lg hover:bg-gray-800/70 transition-all"
@@ -178,6 +226,19 @@ export default function Tasks() {
             </div>
           ))}
         </div>
+
+        {/* Completed tasks section */}
+        {tasks.some(task => task.completed) && (
+          <div className="mt-8 border-t border-gray-700 pt-4">
+            <button
+              onClick={() => setShowCompleted(prev => !prev)}
+              className="flex items-center gap-2 text-gray-400 hover:text-white"
+            >
+              {showCompleted ? <ChevronUpIcon className="w-5 h-5" /> : <ChevronDownIcon className="w-5 h-5" />}
+              Completed Tasks ({tasks.filter(t => t.completed).length})
+            </button>
+          </div>
+        )}
 
         {isEditorOpen && (
           <TaskEditor
