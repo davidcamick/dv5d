@@ -10,6 +10,8 @@ import {
 import StatusDot from '../components/ui/StatusDot';
 
 const WORKER_URL = 'https://dv5d-tasks.accounts-abd.workers.dev';
+const MAX_RETRIES = 3;
+const RETRY_DELAY = 1000;
 
 export default function Tasks() {
   const [tasks, setTasks] = useState([]);
@@ -26,6 +28,7 @@ export default function Tasks() {
   const [taskStatuses, setTaskStatuses] = useState(new Map());
   const [localTasks, setLocalTasks] = useState(new Map()); // Tasks waiting for server confirmation
   const [isRefreshing, setIsRefreshing] = useState(false); // Add this state
+  const [error, setError] = useState(null);
 
   // Get unique tags from all tasks
   const availableTags = useMemo(() => {
@@ -99,10 +102,16 @@ export default function Tasks() {
   }, []);
 
   // Optimize fetch to only run when needed
-  const fetchTasks = async () => {
+  const fetchTasks = async (retries = MAX_RETRIES) => {
     try {
+      setIsRefreshing(true);
+      setError(null);
+      
       const response = await fetch(WORKER_URL);
-      if (!response.ok) throw new Error('Failed to fetch');
+      if (!response.ok) {
+        throw new Error(`Server responded with ${response.status}`);
+      }
+      
       const serverTasks = await response.json();
       
       // Get IDs of tasks on server
@@ -140,6 +149,13 @@ export default function Tasks() {
       setTasks(mergedTasks);
     } catch (error) {
       console.error('Error fetching tasks:', error);
+      if (retries > 0) {
+        setTimeout(() => fetchTasks(retries - 1), RETRY_DELAY);
+      } else {
+        setError('Failed to load tasks. Please try again later.');
+      }
+    } finally {
+      setIsRefreshing(false);
     }
   };
 
@@ -170,8 +186,6 @@ export default function Tasks() {
   // Update polling to be more efficient
   useEffect(() => {
     fetchTasks();
-    const intervalId = setInterval(fetchTasks, 5000); // Reduced to 5 second polling
-    return () => clearInterval(intervalId);
   }, []); // Remove pendingChanges dependency
 
   // Remove the loading state since we'll always be updating
@@ -222,11 +236,11 @@ export default function Tasks() {
         throw new Error('Failed to save task');
       }
 
-      // Server will confirm through polling
+      // Fetch updated task list after successful save
+      await fetchTasks();
     } catch (error) {
       console.error('Error saving task:', error);
-      // Keep the task in local state even if save fails
-      // User can try again or task will sync when connection restored
+      setError('Failed to save task. Changes will sync when connection is restored.');
     }
   };
 
@@ -255,8 +269,12 @@ export default function Tasks() {
             newMap.delete(id);
             return newMap;
           });
+          
+          // Fetch updated task list after successful deletion
+          await fetchTasks();
         } catch (error) {
           console.error('Error deleting task:', error);
+          setError('Failed to delete task. Please try again.');
         }
       }, 10000); // 10 second delay
 
@@ -268,6 +286,7 @@ export default function Tasks() {
       alert('Task deleted. You have 10 seconds to undo.');
     } catch (error) {
       console.error('Error deleting task:', error);
+      setError('Failed to delete task. Please try again.');
     }
   };
 
@@ -350,12 +369,13 @@ export default function Tasks() {
     // Background save
     try {
       await handleSaveTask(updatedTask);
+      await fetchTasks();
     } catch (error) {
       // Revert on error
       setTasks(prev => prev.map(t => 
         t.id === task.id ? task : t
       ));
-      setPendingChanges(false);
+      setError('Failed to update task status. Please try again.');
     }
   };
 
@@ -723,6 +743,13 @@ export default function Tasks() {
               setEditingTask(null);
             }}
           />
+        )}
+
+        {/* Add error display */}
+        {error && (
+          <div className="fixed top-4 right-4 bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg">
+            {error}
+          </div>
         )}
       </div>
     </div>
