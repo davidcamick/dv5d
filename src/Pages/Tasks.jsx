@@ -21,7 +21,6 @@ export default function Tasks() {
   const [sortConfig, setSortConfig] = useState({ field: null, direction: null });
   const [deletedTasks, setDeletedTasks] = useState(new Map()); // Track deleted tasks for undo
   const [undoTimers, setUndoTimers] = useState(new Map()); // Track undo timers
-  const [lastUpdate, setLastUpdate] = useState(Date.now());
   const [isRefreshing, setIsRefreshing] = useState(false); // Add this state
   const [error, setError] = useState(null);
 
@@ -121,23 +120,14 @@ export default function Tasks() {
     }
   };
 
-  // Add new function for manual refresh
+  // Simplified manual refresh
   const handleManualRefresh = async () => {
     setIsRefreshing(true);
     try {
       const response = await fetch(WORKER_URL);
       if (!response.ok) throw new Error('Failed to fetch');
       const serverTasks = await response.json();
-      
-      // Merge with local tasks, keeping local ones
-      const serverTaskIds = new Set(serverTasks.map(t => t.id));
-      const mergedTasks = [
-        ...serverTasks,
-        ...Array.from(localTasks.values())
-          .filter(task => !serverTaskIds.has(task.id))
-      ];
-      
-      setTasks(mergedTasks);
+      setTasks(serverTasks);
     } catch (error) {
       console.error('Error refreshing tasks:', error);
     } finally {
@@ -290,7 +280,7 @@ export default function Tasks() {
     );
   };
 
-  // Optimize task completion
+  // Simplified task completion
   const handleTaskCompletion = async (task) => {
     const taskElement = document.getElementById(`task-${task.id}`);
     const containerElement = taskElement?.parentElement;
@@ -306,25 +296,29 @@ export default function Tasks() {
     
     const updatedTask = { ...task, completed: !task.completed };
     
-    // Optimistic update
-    setTasks(prev => prev.map(t => 
-      t.id === task.id ? updatedTask : t
-    ));
-    setPendingChanges(true);
-
-    if (updatedTask.completed) {
-      setShowCompleted(false);
-    }
-
-    // Background save
     try {
-      await handleSaveTask(updatedTask);
-      await fetchTasks();
-    } catch (error) {
-      // Revert on error
+      // Make the API call first
+      const response = await fetch(`${WORKER_URL}/${task.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(updatedTask)
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update task');
+      }
+
+      // Update local state after successful API call
       setTasks(prev => prev.map(t => 
-        t.id === task.id ? task : t
+        t.id === task.id ? updatedTask : t
       ));
+
+      if (updatedTask.completed) {
+        setShowCompleted(false);
+      }
+    } catch (error) {
       setError('Failed to update task status. Please try again.');
     }
   };
