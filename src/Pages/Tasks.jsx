@@ -5,9 +5,8 @@ import {
   PlusIcon, PencilSquareIcon as PencilIcon,
   CalendarDaysIcon as CalendarIcon, TagIcon,
   ChevronDownIcon, ChevronUpIcon, CheckIcon,
-  ArrowUpIcon, ArrowDownIcon, ArrowPathIcon // Add this import
+  ArrowUpIcon, ArrowDownIcon, ArrowPathIcon
 } from '@heroicons/react/24/outline';
-import StatusDot from '../components/ui/StatusDot';
 
 const WORKER_URL = 'https://dv5d-tasks.accounts-abd.workers.dev';
 const MAX_RETRIES = 3;
@@ -23,10 +22,6 @@ export default function Tasks() {
   const [deletedTasks, setDeletedTasks] = useState(new Map()); // Track deleted tasks for undo
   const [undoTimers, setUndoTimers] = useState(new Map()); // Track undo timers
   const [lastUpdate, setLastUpdate] = useState(Date.now());
-  const [pendingChanges, setPendingChanges] = useState(false);
-  const [localUpdates, setLocalUpdates] = useState(new Map()); // Track pending updates
-  const [taskStatuses, setTaskStatuses] = useState(new Map());
-  const [localTasks, setLocalTasks] = useState(new Map()); // Tasks waiting for server confirmation
   const [isRefreshing, setIsRefreshing] = useState(false); // Add this state
   const [error, setError] = useState(null);
 
@@ -113,40 +108,7 @@ export default function Tasks() {
       }
       
       const serverTasks = await response.json();
-      
-      // Get IDs of tasks on server
-      const serverTaskIds = new Set(serverTasks.map(t => t.id));
-      
-      // Check which local tasks are now on server
-      localTasks.forEach((localTask, id) => {
-        if (serverTaskIds.has(id)) {
-          // Found the task on server - mark as synced
-          setTaskStatuses(prev => new Map(prev).set(id, 'synced'));
-          setTimeout(() => {
-            setTaskStatuses(prev => {
-              const next = new Map(prev);
-              next.delete(id);
-              return next;
-            });
-            // Only remove from local tasks after showing green dot
-            setLocalTasks(prev => {
-              const next = new Map(prev);
-              next.delete(id);
-              return next;
-            });
-          }, 3000);
-        }
-      });
-
-      // Combine server tasks with local tasks, preferring local versions
-      const mergedTasks = [
-        // First, add all server tasks that aren't in local state
-        ...serverTasks.filter(task => !localTasks.has(task.id)),
-        // Then add all local tasks (these take precedence)
-        ...Array.from(localTasks.values())
-      ];
-
-      setTasks(mergedTasks);
+      setTasks(serverTasks);
     } catch (error) {
       console.error('Error fetching tasks:', error);
       if (retries > 0) {
@@ -203,18 +165,6 @@ export default function Tasks() {
         id: newId,
         createdAt: isNewTask ? Date.now() : taskData.createdAt
       };
-
-      // Add to local tasks and show pending status
-      if (isNewTask) {
-        setLocalTasks(prev => new Map(prev).set(newId, fullTaskData));
-        setTaskStatuses(prev => new Map(prev).set(newId, 'pending'));
-      }
-
-      // Optimistic update
-      setTasks(prev => {
-        if (isNewTask) return [...prev, fullTaskData];
-        return prev.map(t => t.id === newId ? fullTaskData : t);
-      });
 
       // UI updates
       setIsEditorOpen(false);
@@ -407,16 +357,6 @@ export default function Tasks() {
     document.title = upcomingCount > 0 ? `dv5d - ${upcomingCount}` : 'dv5d';
   }, [tasks]);
 
-  // Modify task rendering to show status dot based on whether task is local or confirmed
-  const getTaskStatus = (taskId) => {
-    // If task is in localTasks, it's pending server confirmation
-    if (localTasks.has(taskId)) {
-      return 'pending';
-    }
-    // Otherwise use the regular status (for showing brief 'synced' state)
-    return taskStatuses.get(taskId);
-  };
-
   if (loading) {
     return <div className="text-center py-8">Loading tasks...</div>;
   }
@@ -510,10 +450,6 @@ export default function Tasks() {
                 className="bg-gray-800/50 rounded-lg p-4 shadow-lg hover:bg-gray-800/70 transition-all task-item"
               >
                 <div className="flex items-start gap-4">
-                  {/* Add status dot */}
-                  <div className="mt-2">
-                    <StatusDot status={getTaskStatus(task.id)} />
-                  </div>
                   <button
                     onClick={() => handleTaskCompletion(task)}
                     className="custom-checkbox mt-1.5 w-5 h-5 rounded-full border-2 border-gray-400 
@@ -623,10 +559,6 @@ export default function Tasks() {
                 {completedTasks.map((task) => (
                   <div key={task.id} className="bg-gray-800/30 rounded-lg p-4 shadow-lg">
                     <div className="flex items-start gap-4">
-                      {/* Add status dot */}
-                      <div className="mt-2">
-                        <StatusDot status={getTaskStatus(task.id)} />
-                      </div>
                       <button
                         onClick={() => handleTaskCompletion(task)}
                         className="custom-checkbox mt-1.5 w-5 h-5 rounded-full border-2 border-gray-400 
