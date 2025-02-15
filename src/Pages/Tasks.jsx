@@ -313,7 +313,9 @@ export default function Tasks() {
       tags: [],
       links: [],
       color: '#ffffff', // Set default color to white
-      notes: ''
+      notes: '',
+      completed: false,  // Add this
+      createdAt: Date.now()  // Add this
     });
     setIsEditorOpen(true);
   };

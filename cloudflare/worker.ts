@@ -32,6 +32,22 @@ interface Task {
   notes?: string;         // ✅ Handles additional notes
 }
 
+// Add validation helper
+function sanitizeTask(task: Partial<Task>): Task {
+  return {
+    id: task.id || crypto.randomUUID(),
+    text: task.text || '',
+    completed: Boolean(task.completed),
+    createdAt: task.createdAt || Date.now(),
+    dueDate: task.dueDate || null,
+    priority: task.priority || 'medium',
+    color: task.color || '#ffffff',
+    notes: task.notes || '',
+    tags: task.tags || [],
+    links: task.links || []
+  };
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const corsHeaders = {
@@ -66,8 +82,7 @@ export default {
           });
 
         case 'POST':
-          const newTask: Task = await request.json();
-          const id = crypto.randomUUID();
+          const newTask = sanitizeTask(await request.json());
           
           await env.DB
             .prepare(`
@@ -76,10 +91,10 @@ export default {
               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `)
             .bind(
-              id,
+              newTask.id,
               newTask.text,
-              newTask.completed,
-              Date.now(),
+              newTask.completed ? 1 : 0,
+              newTask.createdAt,
               newTask.dueDate,
               newTask.priority,
               newTask.color,
@@ -89,13 +104,13 @@ export default {
             )
             .run();
 
-          return new Response(JSON.stringify({ ...newTask, id }), {
+          return new Response(JSON.stringify(newTask), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
           });
 
         case 'PUT':
           if (!taskId) throw new Error('Task ID required');
-          const taskToUpdate: Task = await request.json();
+          const taskToUpdate = sanitizeTask(await request.json());
 
           await env.DB
             .prepare(`
@@ -106,7 +121,7 @@ export default {
             `)
             .bind(
               taskToUpdate.text,
-              taskToUpdate.completed,
+              taskToUpdate.completed ? 1 : 0,
               taskToUpdate.dueDate,
               taskToUpdate.priority,
               taskToUpdate.color,
@@ -141,6 +156,7 @@ export default {
           });
       }
     } catch (error) {
+      console.error('Worker error:', error);
       return new Response(
         JSON.stringify({ error: error.message }), {
           status: 500,
