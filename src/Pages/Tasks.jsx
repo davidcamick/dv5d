@@ -9,7 +9,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { AnimatedGridPattern } from '../components/ui/AnimatedGridPattern';
 import { AuroraText } from '../components/ui/AuroraText';
-import { MagicCard } from '../components/ui/MagicCard';
+import { BorderBeam } from '../components/ui/BorderBeam';
 import { MagicButton } from '../components/ui/MagicButton';
 
 const WORKER_URL = 'https://dv5d-tasks.accounts-abd.workers.dev';
@@ -421,13 +421,16 @@ export default function Tasks() {
         animation: pageMount ? 'fadeIn 0.5s ease forwards' : 'none'
       }}
     >
-      <MagicCard
-        gradientFrom={task.color || '#4299E1'}
-        gradientTo={task.priority === 'high' ? '#F56565' : 
-                   task.priority === 'medium' ? '#ED8936' : '#48BB78'}
-        className="w-full"
-      >
-        <div className="p-4 w-full">
+      <div className="relative bg-gray-800/50 rounded-xl p-4 shadow-lg hover:bg-gray-800/70 transition-all group">
+        <BorderBeam 
+          colorFrom={task.color || '#4299E1'}
+          colorTo="#ffffff"
+          size={40}
+          duration={4}
+          delay={index * 0.2}
+        />
+        <div className="relative z-10">
+          {/* Existing task content */}
           <div className="flex items-start gap-4">
             <button
               onClick={() => handleTaskCompletion(task)}
@@ -513,7 +516,7 @@ export default function Tasks() {
             </div>
           </div>
         </div>
-      </MagicCard>
+      </div>
     </div>
   );
 
@@ -533,13 +536,16 @@ export default function Tasks() {
           <AuroraText as="h1" className="text-3xl font-bold">
             Welcome, Sir Camick
           </AuroraText>
-          <MagicButton
+          <button
             onClick={() => openEditor()}
-            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center gap-2"
+            className="relative px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center gap-2 group"
           >
-            
-            New Task
-          </MagicButton>
+            <BorderBeam colorFrom="#4299E1" colorTo="#ffffff" size={30} />
+            <span className="relative z-10">
+              <PlusIcon className="w-5 h-5" />
+              New Task
+            </span>
+          </button>
         </div>
 
         {/* Controls with new animation classes */}
