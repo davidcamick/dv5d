@@ -8,6 +8,9 @@ import {
   ArrowUpIcon, ArrowDownIcon, ArrowPathIcon
 } from '@heroicons/react/24/outline';
 import { AnimatedGridPattern } from '../components/ui/AnimatedGridPattern';
+import { AuroraText } from '../components/ui/AuroraText';
+import { MagicCard } from '../components/ui/MagicCard';
+import { MagicButton } from '../components/ui/MagicButton';
 
 const WORKER_URL = 'https://dv5d-tasks.accounts-abd.workers.dev';
 const MAX_RETRIES = 3;
@@ -418,100 +421,99 @@ export default function Tasks() {
         animation: pageMount ? 'fadeIn 0.5s ease forwards' : 'none'
       }}
     >
-      {pendingTasks.has(task.id) && (
-        <div className="absolute top-2 right-2">
-          <ArrowPathIcon className="w-4 h-4 text-blue-400 animate-spin" />
-        </div>
-      )}
-      <div
-        id={`task-${task.id}`}
-        className="bg-gray-800/50 rounded-lg p-4 shadow-lg hover:bg-gray-800/70 transition-all task-item"
+      <MagicCard
+        gradientFrom={task.color || '#4299E1'}
+        gradientTo={task.priority === 'high' ? '#F56565' : 
+                   task.priority === 'medium' ? '#ED8936' : '#48BB78'}
+        className="w-full"
       >
-        <div className="flex items-start gap-4">
-          <button
-            onClick={() => handleTaskCompletion(task)}
-            className="custom-checkbox mt-1.5 w-5 h-5 rounded-full border-2 border-gray-400 
-                     hover:border-white flex items-center justify-center 
-                     transition-all hover:scale-110 focus:outline-none 
-                     group relative"
-          >
-            <CheckIcon 
-              className="w-4 h-4 text-white transform scale-0 
-                       group-hover:scale-75 transition-transform absolute" 
-            />
-          </button>
-          <div className="flex-1 transform-gpu transition-all duration-300">
-            <div className="flex items-center gap-2">
-              <span 
-                className={`text-lg ${task.completed ? 'line-through opacity-50' : ''}`}
-                style={{ color: task.color || '#fff' }}
-              >
-                {task.text}
-              </span>
-              {task.priority && (
-                <span className={`px-2 py-0.5 rounded text-xs ${
-                  task.priority === 'high' ? 'bg-red-500' :
-                  task.priority === 'medium' ? 'bg-yellow-500' :
-                  'bg-blue-500'
-                }`}>
-                  {task.priority}
+        <div className="p-4 w-full">
+          <div className="flex items-start gap-4">
+            <button
+              onClick={() => handleTaskCompletion(task)}
+              className="custom-checkbox mt-1.5 w-5 h-5 rounded-full border-2 border-gray-400 
+                       hover:border-white flex items-center justify-center 
+                       transition-all hover:scale-110 focus:outline-none 
+                       group relative"
+            >
+              <CheckIcon 
+                className="w-4 h-4 text-white transform scale-0 
+                         group-hover:scale-75 transition-transform absolute" 
+              />
+            </button>
+            <div className="flex-1 transform-gpu transition-all duration-300">
+              <div className="flex items-center gap-2">
+                <span 
+                  className={`text-lg ${task.completed ? 'line-through opacity-50' : ''}`}
+                  style={{ color: task.color || '#fff' }}
+                >
+                  {task.text}
                 </span>
+                {task.priority && (
+                  <span className={`px-2 py-0.5 rounded text-xs ${
+                    task.priority === 'high' ? 'bg-red-500' :
+                    task.priority === 'medium' ? 'bg-yellow-500' :
+                    'bg-blue-500'
+                  }`}>
+                    {task.priority}
+                  </span>
+                )}
+              </div>
+
+              {task.dueDate && (
+                <div className="flex items-center gap-1 text-gray-400 text-sm mt-1">
+                  <CalendarIcon className="w-4 h-4" />
+                  {formatDateTime(task.dueDate)}
+                </div>
+              )}
+
+              {task.tags?.length > 0 && (
+                <div className="flex items-center gap-2 mt-2">
+                  <TagIcon className="w-4 h-4 text-gray-400" />
+                  {task.tags.map(tag => (
+                    <span key={tag} className="px-2 py-0.5 bg-gray-700 rounded-full text-xs text-white">
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {task.links?.map(link => (
+                <a
+                  key={link.url}
+                  href={link.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-2 block p-2 rounded bg-gray-700/50 hover:bg-gray-700/70 text-blue-400 text-sm"
+                >
+                  {link.url}
+                </a>
+              ))}
+
+              {task.notes && (
+                <p className="mt-2 text-gray-400 text-sm whitespace-pre-wrap">
+                  {task.notes}
+                </p>
               )}
             </div>
 
-            {task.dueDate && (
-              <div className="flex items-center gap-1 text-gray-400 text-sm mt-1">
-                <CalendarIcon className="w-4 h-4" />
-                {formatDateTime(task.dueDate)}
-              </div>
-            )}
-
-            {task.tags?.length > 0 && (
-              <div className="flex items-center gap-2 mt-2">
-                <TagIcon className="w-4 h-4 text-gray-400" />
-                {task.tags.map(tag => (
-                  <span key={tag} className="px-2 py-0.5 bg-gray-700 rounded-full text-xs text-white">
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            )}
-
-            {task.links?.map(link => (
-              <a
-                key={link.url}
-                href={link.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-2 block p-2 rounded bg-gray-700/50 hover:bg-gray-700/70 text-blue-400 text-sm"
+            <div className="flex gap-2">
+              <button
+                onClick={() => openEditor(task)}
+                className="p-2 text-gray-400 hover:text-white rounded-lg hover:bg-gray-700/50"
               >
-                {link.url}
-              </a>
-            ))}
-
-            {task.notes && (
-              <p className="mt-2 text-gray-400 text-sm whitespace-pre-wrap">
-                {task.notes}
-              </p>
-            )}
-          </div>
-
-          <div className="flex gap-2">
-            <button
-              onClick={() => openEditor(task)}
-              className="p-2 text-gray-400 hover:text-white rounded-lg hover:bg-gray-700/50"
-            >
-              <PencilIcon className="w-5 h-5" />
-            </button>
-            <button
-              onClick={() => deleteTask(task.id)}
-              className="p-2 text-red-400 hover:text-red-500 rounded-lg hover:bg-gray-700/50"
-            >
-              ×
-            </button>
+                <PencilIcon className="w-5 h-5" />
+              </button>
+              <button
+                onClick={() => deleteTask(task.id)}
+                className="p-2 text-red-400 hover:text-red-500 rounded-lg hover:bg-gray-700/50"
+              >
+                ×
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      </MagicCard>
     </div>
   );
 
@@ -526,32 +528,22 @@ export default function Tasks() {
         duration={3}
       />
       <div className="container mx-auto px-4 py-8 relative z-10">
-        {/* Header with fade-in */}
-        <div 
-          className="flex justify-between items-center mb-8" 
-          style={{ 
-            animation: pageMount ? 'fadeIn 0.5s ease forwards' : 'none',
-            animationDelay: '0.1s' 
-          }}
-        >
-          <h1 className="text-3xl font-bold text-white">Welcome, Sir Camick</h1>
-          <button
+        {/* Header with new animation classes */}
+        <div className={`flex justify-between items-center mb-8 ${pageMount ? 'animate-fadeIn' : ''}`}>
+          <AuroraText as="h1" className="text-3xl font-bold">
+            Welcome, Sir Camick
+          </AuroraText>
+          <MagicButton
             onClick={() => openEditor()}
             className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center gap-2"
           >
-            <PlusIcon className="w-5 h-5" />
+            
             New Task
-          </button>
+          </MagicButton>
         </div>
 
-        {/* Sort controls with fade-in */}
-        <div 
-          className="flex gap-4 mb-4"
-          style={{ 
-            animation: pageMount ? 'fadeIn 0.5s ease forwards' : 'none',
-            animationDelay: '0.2s' 
-          }}
-        >
+        {/* Controls with new animation classes */}
+        <div className={`flex gap-4 mb-4 ${pageMount ? 'animate-fadeIn delay-200' : ''}`}>
           <button
             onClick={handleManualRefresh}
             className={`p-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-700/50 transition-all
@@ -592,15 +584,9 @@ export default function Tasks() {
           </button>
         </div>
 
-        {/* Tag filters with fade-in */}
+        {/* Tags with new animation classes */}
         {availableTags.length > 0 && (
-          <div 
-            className="mb-6 flex flex-wrap gap-2"
-            style={{ 
-              animation: pageMount ? 'fadeIn 0.5s ease forwards' : 'none',
-              animationDelay: '0.3s' 
-            }}
-          >
+          <div className={`mb-6 flex flex-wrap gap-2 ${pageMount ? 'animate-fadeIn delay-300' : ''}`}>
             {availableTags.map(tag => (
               <button
                 key={tag}
