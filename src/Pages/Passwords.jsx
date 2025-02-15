@@ -157,12 +157,18 @@ export default function Passwords() {
                 e.preventDefault();
                 handleUnlock();
               }}>
+                <input 
+                  type="text"
+                  autoComplete="username"
+                  style={{ display: 'none' }}
+                  aria-hidden="true"
+                />
                 <input
                   type="password"
                   value={masterPassword}
                   onChange={(e) => setMasterPassword(e.target.value)}
                   placeholder="Master Password"
-                  autoComplete="new-password"
+                  autoComplete="current-password"
                   className="w-full px-4 py-2 bg-gray-700/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
                 />
                 <button
@@ -255,7 +261,13 @@ export default function Passwords() {
                         rel="noopener noreferrer"
                         className="text-blue-400 text-sm hover:text-blue-300"
                       >
-                        {new URL(password.url).hostname}
+                        {(() => {
+                          try {
+                            return new URL(password.url).hostname;
+                          } catch {
+                            return password.url;
+                          }
+                        })()}
                       </a>
                     )}
                   </div>
