@@ -7,6 +7,7 @@ import {
   ChevronDownIcon, ChevronUpIcon, CheckIcon,
   ArrowUpIcon, ArrowDownIcon, ArrowPathIcon
 } from '@heroicons/react/24/outline';
+import { AnimatedGridPattern } from '../components/ui/AnimatedGridPattern';
 
 const WORKER_URL = 'https://dv5d-tasks.accounts-abd.workers.dev';
 const MAX_RETRIES = 3;
@@ -250,9 +251,7 @@ export default function Tasks() {
       // Store timer ID for cleanup
       setUndoTimers(prev => new Map(prev).set(id, timerId));
 
-      // Show toast notification
-      // You might want to add a toast library like react-hot-toast
-      alert('Task deleted. You have 10 seconds to undo.');
+      // Remove the alert
     } catch (error) {
       console.error('Error deleting task:', error);
       setError('Failed to delete task. Please try again.');
@@ -393,6 +392,24 @@ export default function Tasks() {
     return <div className="text-center py-8">Loading tasks...</div>;
   }
 
+  const formatDateTime = (timestamp) => {
+    const date = new Date(timestamp);
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    
+    let dateStr;
+    if (date.toDateString() === today.toDateString()) {
+      dateStr = 'Today';
+    } else if (date.toDateString() === tomorrow.toDateString()) {
+      dateStr = 'Tomorrow';
+    } else {
+      dateStr = date.toLocaleDateString();
+    }
+
+    return `${dateStr} at ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+  };
+
   const TaskItem = ({ task, index, ...props }) => (
     <div 
       className={`relative ${pendingTasks.has(task.id) ? 'opacity-50' : ''}`}
@@ -445,7 +462,7 @@ export default function Tasks() {
             {task.dueDate && (
               <div className="flex items-center gap-1 text-gray-400 text-sm mt-1">
                 <CalendarIcon className="w-4 h-4" />
-                {new Date(task.dueDate).toLocaleDateString()}
+                {formatDateTime(task.dueDate)}
               </div>
             )}
 
@@ -499,8 +516,16 @@ export default function Tasks() {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
-      <div className="container mx-auto px-4 py-8">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 relative overflow-hidden">
+      <AnimatedGridPattern 
+        className="absolute inset-0 z-0 opacity-50"
+        width={32}
+        height={32}
+        numSquares={75}
+        maxOpacity={0.15}
+        duration={3}
+      />
+      <div className="container mx-auto px-4 py-8 relative z-10">
         {/* Header with fade-in */}
         <div 
           className="flex justify-between items-center mb-8" 
@@ -631,18 +656,23 @@ export default function Tasks() {
 
         {/* Add undo button for recently deleted tasks */}
         {deletedTasks.size > 0 && (
-          <div className="fixed bottom-4 right-4 space-y-2">
-            {Array.from(deletedTasks).map(([id, task]) => (
-              <div key={id} className="bg-gray-800 p-4 rounded-lg shadow-lg flex items-center gap-4">
-                <span className="text-gray-300">Task deleted: {task.text}</span>
-                <button
-                  onClick={() => undoDelete(id)}
-                  className="px-3 py-1 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
-                >
-                  Undo
-                </button>
+          <div className="fixed bottom-4 right-4">
+            <div className="bg-gray-800/90 p-4 rounded-lg shadow-lg flex items-center gap-4">
+              <div className="flex flex-col gap-2">
+                {Array.from(deletedTasks).map(([id, task]) => (
+                  <div key={id} className="flex items-center gap-2">
+                    <button
+                      onClick={() => undoDelete(id)}
+                      className="text-sm px-2 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded flex items-center gap-1"
+                    >
+                      <ArrowPathIcon className="w-3 h-3" />
+                      Undo
+                    </button>
+                    <span className="text-gray-400 text-sm">Deleted: {task.text}</span>
+                  </div>
+                ))}
               </div>
-            ))}
+            </div>
           </div>
         )}
 

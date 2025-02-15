@@ -82,8 +82,8 @@ export default function TaskEditor({ task, onSave, onClose }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4">
-      <div className="bg-gray-900 rounded-lg p-6 w-full max-w-2xl">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-gray-800 rounded-lg p-6 w-full max-w-md">
         <h2 className="text-2xl font-bold text-white mb-4">
           {task ? 'Edit Task' : 'New Task'}
         </h2>
@@ -101,13 +101,36 @@ export default function TaskEditor({ task, onSave, onClose }) {
 
           <div className="flex gap-4">
             <div className="flex-1">
-              <label className="block text-gray-400 mb-2">Due Date</label>
-              <DatePicker
-                selected={editedTask.dueDate}
-                onChange={date => setEditedTask(prev => ({ ...prev, dueDate: date }))}
-                className="w-full px-4 py-2 bg-gray-800 text-white rounded-lg"
-                placeholderText="Select due date..."
-              />
+              <label className="block text-gray-400 mb-2">Due Date & Time</label>
+              <div className="flex gap-2">
+                <input
+                  type="date"
+                  value={editedTask.dueDate ? new Date(editedTask.dueDate).toISOString().split('T')[0] : ''}
+                  onChange={(e) => {
+                    const date = e.target.value ? new Date(e.target.value) : null;
+                    if (date) {
+                      // Preserve existing time if there is one
+                      const existingDate = editedTask.dueDate ? new Date(editedTask.dueDate) : new Date();
+                      date.setHours(existingDate.getHours(), existingDate.getMinutes());
+                    }
+                    setEditedTask(prev => ({ ...prev, dueDate: date ? date.getTime() : null }));
+                  }}
+                  className="bg-gray-700 text-white rounded px-3 py-2 w-full"
+                />
+                {editedTask.dueDate && (
+                  <input
+                    type="time"
+                    value={editedTask.dueDate ? new Date(editedTask.dueDate).toTimeString().slice(0, 5) : ''}
+                    onChange={(e) => {
+                      const [hours, minutes] = e.target.value.split(':');
+                      const date = new Date(editedTask.dueDate);
+                      date.setHours(hours, minutes);
+                      setEditedTask(prev => ({ ...prev, dueDate: date.getTime() }));
+                    }}
+                    className="bg-gray-700 text-white rounded px-3 py-2"
+                  />
+                )}
+              </div>
             </div>
 
             <div>
