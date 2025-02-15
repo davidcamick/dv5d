@@ -413,112 +413,127 @@ export default function Tasks() {
     return `${dateStr} at ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
   };
 
-  const TaskItem = ({ task, index, ...props }) => (
-    <div 
-      className={`relative ${pendingTasks.has(task.id) ? 'opacity-50' : ''}`}
-      style={{ 
-        animationDelay: pageMount ? `${0.4 + (index * 0.1)}s` : '0s',
-        animation: pageMount ? 'fadeIn 0.5s ease forwards' : 'none'
-      }}
-    >
-      <div className="relative bg-gray-800/50 rounded-xl p-4 shadow-lg hover:bg-gray-800/70 transition-all group">
-        <BorderBeam 
-          colorFrom={task.color || '#4299E1'}
-          colorTo="#ffffff"
-          size={40}
-          duration={8} // Increased from 4 to 8
-          delay={index * 0.2}
-        />
-        <div className="relative z-10">
-          {/* Existing task content */}
-          <div className="flex items-start gap-4">
-            <button
-              onClick={() => handleTaskCompletion(task)}
-              className="custom-checkbox mt-1.5 w-5 h-5 rounded-full border-2 border-gray-400 
-                       hover:border-white flex items-center justify-center 
-                       transition-all hover:scale-110 focus:outline-none 
-                       group relative"
-            >
-              <CheckIcon 
-                className="w-4 h-4 text-white transform scale-0 
-                         group-hover:scale-75 transition-transform absolute" 
-              />
-            </button>
-            <div className="flex-1 transform-gpu transition-all duration-300">
-              <div className="flex items-center gap-2">
-                <span 
-                  className={`text-lg ${task.completed ? 'line-through opacity-50' : ''}`}
-                  style={{ color: task.color || '#fff' }}
-                >
-                  {task.text}
-                </span>
-                {task.priority && (
-                  <span className={`px-2 py-0.5 rounded text-xs ${
-                    task.priority === 'high' ? 'bg-red-500' :
-                    task.priority === 'medium' ? 'bg-yellow-500' :
-                    'bg-blue-500'
-                  }`}>
-                    {task.priority}
+  const TaskItem = ({ task, index, ...props }) => {
+    const [isHovered, setIsHovered] = useState(false);
+    const [hasBeenHovered, setHasBeenHovered] = useState(false);
+
+    const handleMouseEnter = () => {
+      if (!hasBeenHovered) {
+        setIsHovered(true);
+        setHasBeenHovered(true);
+      }
+    };
+
+    return (
+      <div 
+        className={`relative ${pendingTasks.has(task.id) ? 'opacity-50' : ''}`}
+        style={{ 
+          animationDelay: pageMount ? `${0.4 + (index * 0.1)}s` : '0s',
+          animation: pageMount ? 'fadeIn 0.5s ease forwards' : 'none'
+        }}
+      >
+        <div 
+          className="relative bg-gray-800/50 rounded-xl p-4 shadow-lg hover:bg-gray-800/70 transition-all group"
+          onMouseEnter={handleMouseEnter}
+        >
+          <BorderBeam 
+            colorFrom={task.color || '#4299E1'}
+            colorTo="#ffffff"
+            size={40}
+            duration={8}
+            isVisible={isHovered}
+          />
+          <div className="relative z-10">
+            {/* Existing task content */}
+            <div className="flex items-start gap-4">
+              <button
+                onClick={() => handleTaskCompletion(task)}
+                className="custom-checkbox mt-1.5 w-5 h-5 rounded-full border-2 border-gray-400 
+                         hover:border-white flex items-center justify-center 
+                         transition-all hover:scale-110 focus:outline-none 
+                         group relative"
+              >
+                <CheckIcon 
+                  className="w-4 h-4 text-white transform scale-0 
+                           group-hover:scale-75 transition-transform absolute" 
+                />
+              </button>
+              <div className="flex-1 transform-gpu transition-all duration-300">
+                <div className="flex items-center gap-2">
+                  <span 
+                    className={`text-lg ${task.completed ? 'line-through opacity-50' : ''}`}
+                    style={{ color: task.color || '#fff' }}
+                  >
+                    {task.text}
                   </span>
+                  {task.priority && (
+                    <span className={`px-2 py-0.5 rounded text-xs ${
+                      task.priority === 'high' ? 'bg-red-500' :
+                      task.priority === 'medium' ? 'bg-yellow-500' :
+                      'bg-blue-500'
+                    }`}>
+                      {task.priority}
+                    </span>
+                  )}
+                </div>
+
+                {task.dueDate && (
+                  <div className="flex items-center gap-1 text-gray-400 text-sm mt-1">
+                    <CalendarIcon className="w-4 h-4" />
+                    {formatDateTime(task.dueDate)}
+                  </div>
+                )}
+
+                {task.tags?.length > 0 && (
+                  <div className="flex items-center gap-2 mt-2">
+                    <TagIcon className="w-4 h-4 text-gray-400" />
+                    {task.tags.map(tag => (
+                      <span key={tag} className="px-2 py-0.5 bg-gray-700 rounded-full text-xs text-white">
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {task.links?.map(link => (
+                  <a
+                    key={link.url}
+                    href={link.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-2 block p-2 rounded bg-gray-700/50 hover:bg-gray-700/70 text-blue-400 text-sm"
+                  >
+                    {link.url}
+                  </a>
+                ))}
+
+                {task.notes && (
+                  <p className="mt-2 text-gray-400 text-sm whitespace-pre-wrap">
+                    {task.notes}
+                  </p>
                 )}
               </div>
 
-              {task.dueDate && (
-                <div className="flex items-center gap-1 text-gray-400 text-sm mt-1">
-                  <CalendarIcon className="w-4 h-4" />
-                  {formatDateTime(task.dueDate)}
-                </div>
-              )}
-
-              {task.tags?.length > 0 && (
-                <div className="flex items-center gap-2 mt-2">
-                  <TagIcon className="w-4 h-4 text-gray-400" />
-                  {task.tags.map(tag => (
-                    <span key={tag} className="px-2 py-0.5 bg-gray-700 rounded-full text-xs text-white">
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-              )}
-
-              {task.links?.map(link => (
-                <a
-                  key={link.url}
-                  href={link.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-2 block p-2 rounded bg-gray-700/50 hover:bg-gray-700/70 text-blue-400 text-sm"
+              <div className="flex gap-2">
+                <button
+                  onClick={() => openEditor(task)}
+                  className="p-2 text-gray-400 hover:text-white rounded-lg hover:bg-gray-700/50"
                 >
-                  {link.url}
-                </a>
-              ))}
-
-              {task.notes && (
-                <p className="mt-2 text-gray-400 text-sm whitespace-pre-wrap">
-                  {task.notes}
-                </p>
-              )}
-            </div>
-
-            <div className="flex gap-2">
-              <button
-                onClick={() => openEditor(task)}
-                className="p-2 text-gray-400 hover:text-white rounded-lg hover:bg-gray-700/50"
-              >
-                <PencilIcon className="w-5 h-5" />
-              </button>
-              <button
-                onClick={() => deleteTask(task.id)}
-                className="p-2 text-red-400 hover:text-red-500 rounded-lg hover:bg-gray-700/50"
-              >
-                ×
-              </button>
+                  <PencilIcon className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={() => deleteTask(task.id)}
+                  className="p-2 text-red-400 hover:text-red-500 rounded-lg hover:bg-gray-700/50"
+                >
+                  ×
+                </button>
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 relative overflow-hidden">
@@ -667,6 +682,7 @@ export default function Tasks() {
         {isEditorOpen && (
           <TaskEditor
             task={editingTask}
+            availableTags={availableTags}
             onSave={handleSaveTask}
             onClose={() => {
               setIsEditorOpen(false);

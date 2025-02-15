@@ -6,7 +6,7 @@ import "react-datepicker/dist/react-datepicker.css";
 
 const WORKER_URL = 'https://dv5d-tasks.accounts-abd.workers.dev';
 
-export default function TaskEditor({ task, onSave, onClose }) {
+export default function TaskEditor({ task, availableTags = [], onSave, onClose }) {
   const [editedTask, setEditedTask] = useState(task || {
     text: '',
     dueDate: null,
@@ -157,29 +157,51 @@ export default function TaskEditor({ task, onSave, onClose }) {
 
           <div>
             <label className="block text-gray-400 mb-2">Tags</label>
+            {/* Add available tags section */}
+            {availableTags.length > 0 && (
+              <div className="mb-2 flex flex-wrap gap-2">
+                {availableTags
+                  .filter(tag => !editedTask.tags?.includes(tag))
+                  .map(tag => (
+                    <button
+                      key={tag}
+                      onClick={() => setEditedTask(prev => ({
+                        ...prev,
+                        tags: [...(prev.tags || []), tag]
+                      }))}
+                      className="px-2 py-1 text-sm bg-gray-700 text-gray-300 rounded-full 
+                               hover:bg-blue-500 hover:text-white transition-colors"
+                    >
+                      + {tag}
+                    </button>
+                  ))}
+              </div>
+            )}
+            {/* Existing tags */}
             <div className="flex gap-2 mb-2">
               {editedTask.tags?.map(tag => (
-                <span key={tag} className="px-2 py-1 bg-gray-800 text-white rounded">
+                <span key={tag} className="px-2 py-1 bg-blue-500 text-white rounded-full text-sm">
                   {tag}
                   <button
                     onClick={() => setEditedTask(prev => ({
                       ...prev,
                       tags: prev.tags.filter(t => t !== tag)
                     }))}
-                    className="ml-2 text-red-500"
+                    className="ml-2 text-white/75 hover:text-white"
                   >
                     ×
                   </button>
                 </span>
               ))}
             </div>
+            {/* Add new tag form */}
             <form onSubmit={addTag} className="flex gap-2">
               <input
                 type="text"
                 value={newTag}
                 onChange={e => setNewTag(e.target.value)}
-                className="flex-1 px-4 py-2 bg-gray-800 text-white rounded-lg"
-                placeholder="Add tag..."
+                className="flex-1 px-4 py-2 bg-gray-700 text-white rounded-lg"
+                placeholder="Add new tag..."
               />
               <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-lg">
                 Add
