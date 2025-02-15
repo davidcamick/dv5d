@@ -116,19 +116,11 @@ export default {
           }
 
           const taskToUpdate: Task = await request.json();
-          const existingTask = await env.TASKS_KV.get(taskId);
           
-          if (!existingTask) {
-            return new Response('Task not found', { 
-              status: 404, 
-              headers: corsHeaders 
-            });
-          }
-
+          // Always use the ID from the URL path
           const updatedTask = {
             ...taskToUpdate,
-            id: taskId,
-            createdAt: JSON.parse(existingTask).createdAt
+            id: taskId
           };
 
           await env.TASKS_KV.put(taskId, JSON.stringify(updatedTask));

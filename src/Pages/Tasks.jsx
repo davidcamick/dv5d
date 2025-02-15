@@ -130,38 +130,47 @@ export default function Tasks() {
   // Optimize save task
   const handleSaveTask = async (taskData) => {
     try {
+      const isNewTask = !taskData.id;
+      const newId = isNewTask ? crypto.randomUUID() : taskData.id;
+      
+      // Prepare task data with ID
+      const fullTaskData = {
+        ...taskData,
+        id: newId,
+        createdAt: isNewTask ? Date.now() : taskData.createdAt
+      };
+
       // Optimistic update
-      if (taskData.id) {
-        setTasks(prev => prev.map(t => 
-          t.id === taskData.id ? taskData : t
-        ));
+      if (isNewTask) {
+        setTasks(prev => [...prev, fullTaskData]);
       } else {
-        const newTask = {
-          ...taskData,
-          id: crypto.randomUUID(),
-          createdAt: Date.now()
-        };
-        setTasks(prev => [...prev, newTask]);
-        taskData = newTask;
+        setTasks(prev => prev.map(t => 
+          t.id === newId ? fullTaskData : t
+        ));
       }
 
+      // UI updates
       setIsEditorOpen(false);
       setEditingTask(null);
       setPendingChanges(true);
 
-      // Background save
-      const url = taskData.id ? `${WORKER_URL}/${taskData.id}` : WORKER_URL;
-      const method = taskData.id ? 'PUT' : 'POST';
+      // API call
+      const method = isNewTask ? 'POST' : 'PUT';
+      const url = isNewTask ? WORKER_URL : `${WORKER_URL}/${newId}`;
       
       const response = await fetch(url, {
         method,
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(taskData)
+        body: JSON.stringify(fullTaskData)
       });
       
-      if (!response.ok) throw new Error('Failed to save task');
+      if (!response.ok) {
+        throw new Error('Failed to save task');
+      }
+
+      // Refresh tasks list
       debouncedFetch();
     } catch (error) {
       console.error('Error saving task:', error);
