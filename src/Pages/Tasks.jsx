@@ -146,31 +146,6 @@ export default function Tasks() {
   // Remove the loading state since we'll always be updating
   const [loading, setLoading] = useState(false);
 
-  // Add smart polling after actions
-  const startQuickPolling = () => {
-    // Clear any existing polling
-    if (quickPollTimer) clearTimeout(quickPollTimer);
-    
-    let attempts = 0;
-    const maxAttempts = 25; // 25 attempts at 1 second each
-    const pollInterval = 1000; // Start with 1 second
-
-    const poll = async () => {
-      await fetchTasks();
-      attempts++;
-      
-      // Continue polling if we still have pending tasks and haven't exceeded attempts
-      if (attempts < maxAttempts) {
-        setQuickPollTimer(setTimeout(poll, pollInterval));
-      } else {
-        // Clear pending tasks after polling ends
-        setPendingTasks(new Map());
-      }
-    };
-
-    poll();
-  };
-
   // Fix handleSaveTask function
   const handleSaveTask = async (taskData) => {
     let newId;
@@ -186,14 +161,9 @@ export default function Tasks() {
         createdAt: isNewTask ? Date.now() : taskData.createdAt
       };
 
-      // Optimistic update - add to UI immediately
-      setTasks(prev => isNewTask ? [...prev, fullTaskData] : prev.map(t => t.id === newId ? fullTaskData : t));
+      // Show pending state
       setPendingTasks(prev => new Map(prev).set(newId, fullTaskData));
       
-      // UI updates
-      setIsEditorOpen(false);
-      setEditingTask(null);
-
       // API call
       const method = isNewTask ? 'POST' : 'PUT';
       const url = isNewTask ? WORKER_URL : `${WORKER_URL}/${newId}`;
@@ -211,14 +181,28 @@ export default function Tasks() {
         throw new Error(errorData.error || 'Failed to save task');
       }
 
-      // Start quick polling to confirm task was saved
-      startQuickPolling();
+      // Get fresh task list from server
+      const freshResponse = await fetch(WORKER_URL);
+      if (!freshResponse.ok) throw new Error('Failed to fetch updated tasks');
+      
+      const serverTasks = await freshResponse.json();
+      setTasks(serverTasks);
+      
+      // Clear pending state
+      setPendingTasks(prev => {
+        const next = new Map(prev);
+        next.delete(newId);
+        return next;
+      });
+      
+      // UI updates
+      setIsEditorOpen(false);
+      setEditingTask(null);
       
     } catch (error) {
       console.error('Error saving task:', error);
-      // Only remove from UI if we have the task data
+      // Only remove from pending if we have the task data
       if (newId) {
-        setTasks(prev => prev.filter(t => t.id !== newId));
         setPendingTasks(prev => {
           const next = new Map(prev);
           next.delete(newId);
