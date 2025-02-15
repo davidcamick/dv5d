@@ -104,21 +104,13 @@ export default function Tasks() {
       if (!response.ok) throw new Error('Failed to fetch');
       const serverTasks = await response.json();
       
-      // Check which tasks are confirmed on server
+      // Get IDs of tasks on server
       const serverTaskIds = new Set(serverTasks.map(t => t.id));
       
-      // Merge server tasks with local tasks
-      const mergedTasks = [
-        ...serverTasks,
-        // Keep local tasks that aren't on server yet
-        ...Array.from(localTasks.values())
-          .filter(task => !serverTaskIds.has(task.id))
-      ];
-
-      // Update task statuses
-      serverTaskIds.forEach(id => {
-        if (localTasks.has(id)) {
-          // Task has been confirmed by server
+      // Check which local tasks are now on server
+      localTasks.forEach((localTask, id) => {
+        if (serverTaskIds.has(id)) {
+          // Found the task on server - mark as synced
           setTaskStatuses(prev => new Map(prev).set(id, 'synced'));
           setTimeout(() => {
             setTaskStatuses(prev => {
@@ -126,16 +118,23 @@ export default function Tasks() {
               next.delete(id);
               return next;
             });
+            // Only remove from local tasks after showing green dot
+            setLocalTasks(prev => {
+              const next = new Map(prev);
+              next.delete(id);
+              return next;
+            });
           }, 3000);
-          
-          // Remove from local tasks
-          setLocalTasks(prev => {
-            const next = new Map(prev);
-            next.delete(id);
-            return next;
-          });
         }
       });
+
+      // Combine server tasks with local tasks, preferring local versions
+      const mergedTasks = [
+        // First, add all server tasks that aren't in local state
+        ...serverTasks.filter(task => !localTasks.has(task.id)),
+        // Then add all local tasks (these take precedence)
+        ...Array.from(localTasks.values())
+      ];
 
       setTasks(mergedTasks);
     } catch (error) {
