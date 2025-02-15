@@ -25,6 +25,7 @@ export default function Tasks() {
   const [error, setError] = useState(null);
   const [pendingTasks, setPendingTasks] = useState(new Map()); // Track tasks waiting for confirmation
   const [quickPollTimer, setQuickPollTimer] = useState(null);
+  const [pageMount, setPageMount] = useState(true);
 
   // Get unique tags from all tasks
   const availableTags = useMemo(() => {
@@ -151,7 +152,7 @@ export default function Tasks() {
     if (quickPollTimer) clearTimeout(quickPollTimer);
     
     let attempts = 0;
-    const maxAttempts = 5;
+    const maxAttempts = 25; // 25 attempts at 1 second each
     const pollInterval = 1000; // Start with 1 second
 
     const poll = async () => {
@@ -159,8 +160,11 @@ export default function Tasks() {
       attempts++;
       
       // Continue polling if we still have pending tasks and haven't exceeded attempts
-      if (pendingTasks.size > 0 && attempts < maxAttempts) {
+      if (attempts < maxAttempts) {
         setQuickPollTimer(setTimeout(poll, pollInterval));
+      } else {
+        // Clear pending tasks after polling ends
+        setPendingTasks(new Map());
       }
     };
 
@@ -385,12 +389,24 @@ export default function Tasks() {
     document.title = upcomingCount > 0 ? `dv5d - ${upcomingCount}` : 'dv5d';
   }, [tasks]);
 
+  useEffect(() => {
+    setTimeout(() => {
+      setPageMount(false);
+    }, 1000); // Disable animations after 1 second
+  }, []);
+
   if (loading) {
     return <div className="text-center py-8">Loading tasks...</div>;
   }
 
-  const TaskItem = ({ task, ...props }) => (
-    <div className={`relative ${pendingTasks.has(task.id) ? 'opacity-50' : ''}`}>
+  const TaskItem = ({ task, index, ...props }) => (
+    <div 
+      className={`relative ${pendingTasks.has(task.id) ? 'opacity-50' : ''}`}
+      style={{ 
+        animationDelay: pageMount ? `${0.4 + (index * 0.1)}s` : '0s',
+        animation: pageMount ? 'fadeIn 0.5s ease forwards' : 'none'
+      }}
+    >
       {pendingTasks.has(task.id) && (
         <div className="absolute top-2 right-2">
           <ArrowPathIcon className="w-4 h-4 text-blue-400 animate-spin" />
@@ -492,7 +508,13 @@ export default function Tasks() {
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
       <div className="container mx-auto px-4 py-8">
         {/* Header with fade-in */}
-        <div className="flex justify-between items-center mb-8 fade-in" style={{ animationDelay: '0.1s' }}>
+        <div 
+          className="flex justify-between items-center mb-8" 
+          style={{ 
+            animation: pageMount ? 'fadeIn 0.5s ease forwards' : 'none',
+            animationDelay: '0.1s' 
+          }}
+        >
           <h1 className="text-3xl font-bold text-white">Welcome, Sir Camick</h1>
           <button
             onClick={() => openEditor()}
@@ -504,7 +526,13 @@ export default function Tasks() {
         </div>
 
         {/* Sort controls with fade-in */}
-        <div className="flex gap-4 mb-4 fade-in" style={{ animationDelay: '0.2s' }}>
+        <div 
+          className="flex gap-4 mb-4"
+          style={{ 
+            animation: pageMount ? 'fadeIn 0.5s ease forwards' : 'none',
+            animationDelay: '0.2s' 
+          }}
+        >
           <button
             onClick={handleManualRefresh}
             className={`p-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-700/50 transition-all
@@ -547,7 +575,13 @@ export default function Tasks() {
 
         {/* Tag filters with fade-in */}
         {availableTags.length > 0 && (
-          <div className="mb-6 flex flex-wrap gap-2 fade-in" style={{ animationDelay: '0.3s' }}>
+          <div 
+            className="mb-6 flex flex-wrap gap-2"
+            style={{ 
+              animation: pageMount ? 'fadeIn 0.5s ease forwards' : 'none',
+              animationDelay: '0.3s' 
+            }}
+          >
             {availableTags.map(tag => (
               <button
                 key={tag}
@@ -565,12 +599,12 @@ export default function Tasks() {
         )}
 
         {/* Active tasks with staggered animation */}
-        <div className="space-y-4 mb-8 transition-all stagger-children">
+        <div className="space-y-4 mb-8 transition-all">
           {activeTasks.map((task, index) => (
             <TaskItem 
               key={task.id} 
               task={task}
-              style={{ animationDelay: `${0.4 + (index * 0.1)}s` }}
+              index={index}
             />
           ))}
           {activeTasks.length === 0 && (
