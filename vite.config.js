@@ -4,5 +4,5 @@ import react from '@vitejs/plugin-react'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
-  base: '/dv5d/', // Replace with your repository name
+  base: '/' // Changed to root path for Cloudflare Pagesepository name
 })
