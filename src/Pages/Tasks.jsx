@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { getUserEmail } from '../utils/auth';
 
+const WORKER_URL = 'https://dv5d-tasks.accounts-abd.workers.dev'; // Updated to match deployment
+
 export default function Tasks() {
   const [tasks, setTasks] = useState([]);
   const [newTask, setNewTask] = useState('');
@@ -8,8 +10,12 @@ export default function Tasks() {
 
   const fetchTasks = async () => {
     try {
-      const response = await fetch('https://dv5d-tasks.davidpaulcamick.workers.dev', {
-        headers: { 'X-User-Email': getUserEmail() }
+      console.log('Fetching tasks...'); // Add logging
+      const response = await fetch(WORKER_URL, {
+        headers: { 
+          'X-User-Email': getUserEmail(),
+          'Accept': 'application/json'
+        }
       });
       if (!response.ok) throw new Error('Failed to fetch');
       const data = await response.json();
@@ -26,7 +32,7 @@ export default function Tasks() {
     if (!newTask.trim()) return;
 
     try {
-      const response = await fetch('https://dv5d-tasks.davidpaulcamick.workers.dev', {
+      const response = await fetch(WORKER_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -47,7 +53,7 @@ export default function Tasks() {
 
   const deleteTask = async (id) => {
     try {
-      const response = await fetch(`https://dv5d-tasks.davidpaulcamick.workers.dev/${id}`, {
+      const response = await fetch(`${WORKER_URL}/${id}`, {
         method: 'DELETE',
         headers: { 'X-User-Email': getUserEmail() }
       });
