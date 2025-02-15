@@ -426,7 +426,7 @@ export default function Tasks() {
           colorFrom={task.color || '#4299E1'}
           colorTo="#ffffff"
           size={40}
-          duration={4}
+          duration={8} // Increased from 4 to 8
           delay={index * 0.2}
         />
         <div className="relative z-10">
@@ -538,13 +538,9 @@ export default function Tasks() {
           </AuroraText>
           <button
             onClick={() => openEditor()}
-            className="relative px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center gap-2 group"
+            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
           >
-            <BorderBeam colorFrom="#4299E1" colorTo="#ffffff" size={30} />
-            <span className="relative z-10">
-              <PlusIcon className="w-5 h-5" />
-              New Task
-            </span>
+            New Task
           </button>
         </div>
 
