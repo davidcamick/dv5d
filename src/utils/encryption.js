@@ -44,17 +44,25 @@ export async function encryptData(data, masterPassword) {
 }
 
 export async function decryptData(encryptedData, masterPassword) {
+  if (!encryptedData.encrypted || !encryptedData.iv || !encryptedData.salt) {
+    return [];  // Return empty array for first-time use
+  }
+
   const key = await deriveKey(
     masterPassword,
     new Uint8Array(encryptedData.salt)
   );
   
-  const decrypted = await crypto.subtle.decrypt(
-    { name: "AES-GCM", iv: new Uint8Array(encryptedData.iv) },
-    key,
-    new Uint8Array(encryptedData.encrypted)
-  );
+  try {
+    const decrypted = await crypto.subtle.decrypt(
+      { name: "AES-GCM", iv: new Uint8Array(encryptedData.iv) },
+      key,
+      new Uint8Array(encryptedData.encrypted)
+    );
 
-  const dec = new TextDecoder();
-  return JSON.parse(dec.decode(decrypted));
+    const dec = new TextDecoder();
+    return JSON.parse(dec.decode(decrypted));
+  } catch (error) {
+    throw new Error('Invalid master password');
+  }
 }

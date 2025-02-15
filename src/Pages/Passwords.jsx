@@ -13,7 +13,7 @@ import {
 import PasswordForm from '../components/password/PasswordForm';
 import { encryptData, decryptData } from '../utils/encryption';
 
-const WORKER_URL = 'https://passwords.your-worker.workers.dev';
+const WORKER_URL = 'https://password-manager.accounts-abd.workers.dev';
 
 export default function Passwords() {
   const [isLocked, setIsLocked] = useState(true);
@@ -153,20 +153,25 @@ export default function Passwords() {
                 </p>
               </div>
 
-              <input
-                type="password"
-                value={masterPassword}
-                onChange={(e) => setMasterPassword(e.target.value)}
-                placeholder="Master Password"
-                className="w-full px-4 py-2 bg-gray-700/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
-              />
-
-              <button
-                onClick={handleUnlock}
-                className="w-full px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 mb-4"
-              >
-                Unlock
-              </button>
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                handleUnlock();
+              }}>
+                <input
+                  type="password"
+                  value={masterPassword}
+                  onChange={(e) => setMasterPassword(e.target.value)}
+                  placeholder="Master Password"
+                  autoComplete="new-password"
+                  className="w-full px-4 py-2 bg-gray-700/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
+                />
+                <button
+                  type="submit"
+                  className="w-full px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 mb-4"
+                >
+                  Unlock
+                </button>
+              </form>
 
               {isBiometricAvailable && (
                 <button

@@ -1,23 +1,21 @@
 export default {
   async fetch(request, env) {
     const corsHeaders = {
-      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Origin': '*',  // Changed from 'https://dv5d.org' to '*'
       'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type',
     };
 
-    // Handle CORS preflight requests
+    // Handle CORS preflight
     if (request.method === 'OPTIONS') {
-      return new Response(null, {
-        headers: corsHeaders
+      return new Response(null, { 
+        headers: corsHeaders,
+        status: 200  // Added explicit status
       });
     }
 
     try {
-      const url = new URL(request.url);
-
       if (request.method === 'GET') {
-        // Retrieve encrypted passwords
         const data = await env.PASSWORD_STORE.get('encrypted_passwords');
         return new Response(data || '{}', {
           headers: {
@@ -28,7 +26,6 @@ export default {
       }
 
       if (request.method === 'POST') {
-        // Store encrypted passwords
         const encryptedData = await request.json();
         await env.PASSWORD_STORE.put('encrypted_passwords', JSON.stringify(encryptedData));
         
@@ -40,7 +37,6 @@ export default {
         });
       }
 
-      // Handle unsupported methods
       return new Response('Method not allowed', {
         status: 405,
         headers: corsHeaders
