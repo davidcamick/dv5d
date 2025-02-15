@@ -1,4 +1,4 @@
-const ALLOWED_EMAILS = ['davidpaulcamick@gmail.com']; // Updated allowed emails
+const ALLOWED_EMAILS = ['davidpaulcamick@gmail.com', 'dcamick25@spxstudent.org']; // Updated allowed emails
 
 export const initializeGoogleAuth = () => {
   const script = document.createElement('script');

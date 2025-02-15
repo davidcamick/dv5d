@@ -27,8 +27,8 @@ export default function Login({ onLogin }) {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="bg-white p-8 rounded-lg shadow-md">
+    <div className="min-h-screen flex items-center justify-center bg-gray-900">
+      <div className="bg-gray-800 p-8 rounded-lg shadow-lg text-white">
         <h1 className="text-2xl font-bold mb-6 text-center">Welcome, sir. Please verify your identity.</h1>
         <div id="signInDiv" className="flex justify-center"></div>
       </div>
