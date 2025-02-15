@@ -1,0 +1,7 @@
+name = "password-manager"
+main = "password-manager.js"
+compatibility_date = "2023-01-01"
+
+[[kv_namespaces]]
+binding = "PASSWORD_STORE"
+id = "3936e3d716bd4df687996ba86f92fe8f"
