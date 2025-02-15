@@ -171,13 +171,16 @@ export default function Tasks() {
     poll();
   };
 
-  // Optimize save task
+  // Fix handleSaveTask function
   const handleSaveTask = async (taskData) => {
+    let newId;
+    let fullTaskData;
+
     try {
       const isNewTask = !taskData.id;
-      const newId = isNewTask ? crypto.randomUUID() : taskData.id;
+      newId = isNewTask ? crypto.randomUUID() : taskData.id;
       
-      const fullTaskData = {
+      fullTaskData = {
         ...taskData,
         id: newId,
         createdAt: isNewTask ? Date.now() : taskData.createdAt
@@ -203,20 +206,25 @@ export default function Tasks() {
         body: JSON.stringify(fullTaskData)
       });
       
-      if (!response.ok) throw new Error('Failed to save task');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to save task');
+      }
 
       // Start quick polling to confirm task was saved
       startQuickPolling();
       
     } catch (error) {
       console.error('Error saving task:', error);
-      // Remove failed task from UI
-      setTasks(prev => prev.filter(t => t.id !== fullTaskData.id));
-      setPendingTasks(prev => {
-        const next = new Map(prev);
-        next.delete(fullTaskData.id);
-        return next;
-      });
+      // Only remove from UI if we have the task data
+      if (newId) {
+        setTasks(prev => prev.filter(t => t.id !== newId));
+        setPendingTasks(prev => {
+          const next = new Map(prev);
+          next.delete(newId);
+          return next;
+        });
+      }
       setError('Failed to save task. Please try again.');
     }
   };
@@ -673,3 +681,4 @@ export default function Tasks() {
     </div>
   );
 }
+```

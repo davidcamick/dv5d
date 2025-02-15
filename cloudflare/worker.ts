@@ -1,7 +1,7 @@
 import { fetchLinkPreview } from './link-preview';
 
 interface Env {
-  TASKS_KV: KVNamespace;
+  DB: D1Database;
 }
 
 interface TaskList {
@@ -33,97 +33,105 @@ interface Task {
 }
 
 export default {
-  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+  async fetch(request: Request, env: Env): Promise<Response> {
     const corsHeaders = {
-      'Access-Control-Allow-Origin': 'https://dv5d.org',
+      'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, X-User-Email, If-Modified-Since',
-      'Access-Control-Max-Age': '86400',
+      'Access-Control-Allow-Headers': 'Content-Type'
     };
 
-    // Handle preflight requests
     if (request.method === 'OPTIONS') {
-      return new Response(null, {
-        headers: corsHeaders,
-        status: 204
-      });
+      return new Response(null, { headers: corsHeaders });
     }
 
     try {
       const url = new URL(request.url);
-      const parts = url.pathname.split('/').filter(Boolean);
+      const taskId = url.pathname.split('/')[1];
 
       switch (request.method) {
         case 'GET':
-          // Simplified caching approach
-          const { keys } = await env.TASKS_KV.list();
-          const promises = keys.map(key => env.TASKS_KV.get(key.name));
-          const values = await Promise.all(promises);
-          const tasks = values
-            .map(value => value ? JSON.parse(value) : null)
-            .filter(Boolean);
-          
-          const response = new Response(JSON.stringify(tasks), {
-            headers: { 
-              ...corsHeaders, 
-              'Content-Type': 'application/json',
-              'Cache-Control': 'no-cache' // Disable caching for now
-            },
+          const { results } = await env.DB
+            .prepare('SELECT * FROM tasks ORDER BY created_at DESC')
+            .all();
+
+          // Parse JSON strings back to arrays
+          const tasks = results.map((task: any) => ({
+            ...task,
+            tags: JSON.parse(task.tags || '[]'),
+            links: JSON.parse(task.links || '[]')
+          }));
+
+          return new Response(JSON.stringify(tasks), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
           });
-          
-          return response;
 
         case 'POST':
-          if (url.pathname.endsWith('/preview')) {
-            const { url: previewUrl } = await request.json();
-            const preview = await fetchLinkPreview(previewUrl);
-            return new Response(JSON.stringify(preview), {
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-            });
-          }
-
           const newTask: Task = await request.json();
-          newTask.id = crypto.randomUUID();
-          newTask.createdAt = Date.now();
+          const id = crypto.randomUUID();
+          
+          await env.DB
+            .prepare(`
+              INSERT INTO tasks (id, text, completed, created_at, due_date, priority, 
+                               color, notes, tags, links)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `)
+            .bind(
+              id,
+              newTask.text,
+              newTask.completed,
+              Date.now(),
+              newTask.dueDate,
+              newTask.priority,
+              newTask.color,
+              newTask.notes,
+              JSON.stringify(newTask.tags),
+              JSON.stringify(newTask.links)
+            )
+            .run();
 
-          // Write directly without preview for speed
-          await env.TASKS_KV.put(newTask.id, JSON.stringify(newTask));
-
-          return new Response(JSON.stringify(newTask), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          return new Response(JSON.stringify({ ...newTask, id }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
           });
 
         case 'PUT':
-          const taskId = parts[0];
-          if (!taskId) {
-            return new Response('Task ID required', { 
-              status: 400, 
-              headers: corsHeaders 
-            });
-          }
-
+          if (!taskId) throw new Error('Task ID required');
           const taskToUpdate: Task = await request.json();
-          
-          // Always use the ID from the URL path
-          const updatedTask = {
-            ...taskToUpdate,
-            id: taskId
-          };
 
-          // Write directly without validation for speed
-          await env.TASKS_KV.put(taskId, JSON.stringify(updatedTask));
+          await env.DB
+            .prepare(`
+              UPDATE tasks 
+              SET text = ?, completed = ?, due_date = ?, priority = ?,
+                  color = ?, notes = ?, tags = ?, links = ?
+              WHERE id = ?
+            `)
+            .bind(
+              taskToUpdate.text,
+              taskToUpdate.completed,
+              taskToUpdate.dueDate,
+              taskToUpdate.priority,
+              taskToUpdate.color,
+              taskToUpdate.notes,
+              JSON.stringify(taskToUpdate.tags),
+              JSON.stringify(taskToUpdate.links),
+              taskId
+            )
+            .run();
 
-          return new Response(JSON.stringify(updatedTask), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          return new Response(JSON.stringify(taskToUpdate), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
           });
 
         case 'DELETE':
-          const deleteId = parts[0];
-          await env.TASKS_KV.delete(deleteId);
+          if (!taskId) throw new Error('Task ID required');
           
+          await env.DB
+            .prepare('DELETE FROM tasks WHERE id = ?')
+            .bind(taskId)
+            .run();
+
           return new Response(null, {
             status: 204,
-            headers: corsHeaders,
+            headers: corsHeaders
           });
 
         default:
@@ -133,17 +141,12 @@ export default {
           });
       }
     } catch (error) {
-      console.error('Worker error:', error);
       return new Response(
-        JSON.stringify({ error: 'Internal Server Error', details: error.message }), 
-        { 
-          status: 500, 
-          headers: { 
-            ...corsHeaders,
-            'Content-Type': 'application/json'
-          } 
+        JSON.stringify({ error: error.message }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
       );
     }
-  },
+  }
 };
