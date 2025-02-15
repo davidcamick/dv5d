@@ -4,7 +4,7 @@ import TaskEditor from '../components/ui/TaskEditor';
 import { 
   PlusIcon, PencilSquareIcon as PencilIcon,
   CalendarDaysIcon as CalendarIcon, TagIcon,
-  ChevronDownIcon, ChevronUpIcon 
+  ChevronDownIcon, ChevronUpIcon, CheckIcon 
 } from '@heroicons/react/24/outline';
 
 const WORKER_URL = 'https://dv5d-tasks.accounts-abd.workers.dev';
@@ -102,9 +102,16 @@ export default function Tasks() {
   };
 
   const handleTaskCompletion = async (task) => {
+    const taskElement = document.getElementById(`task-${task.id}`);
+    if (taskElement && !task.completed) {
+      taskElement.classList.add('task-completing');
+      // Wait for animation before updating state
+      await new Promise(resolve => setTimeout(resolve, 300));
+    }
+    
     const updatedTask = { ...task, completed: !task.completed };
     await handleSaveTask(updatedTask);
-    // Automatically hide completed tasks section when completing a task
+    
     if (updatedTask.completed) {
       setShowCompleted(false);
     }
@@ -152,22 +159,32 @@ export default function Tasks() {
         )}
 
         {/* Active tasks */}
-        <div className="space-y-4 mb-8">
+        <div className="space-y-4 mb-8 transition-all">
           {activeTasks.map((task) => (
             <div
+              id={`task-${task.id}`}
               key={task.id}
-              className="bg-gray-800/50 rounded-lg p-4 shadow-lg hover:bg-gray-800/70 transition-all"
+              className="bg-gray-800/50 rounded-lg p-4 shadow-lg hover:bg-gray-800/70 transition-all task-item"
             >
               <div className="flex items-start gap-4">
-                <input
-                  type="checkbox"
-                  checked={false}
-                  onChange={() => handleTaskCompletion(task)}
-                  className="mt-1.5 rounded border-gray-600"
-                />
-                <div className="flex-1">
+                <button
+                  onClick={() => handleTaskCompletion(task)}
+                  className="custom-checkbox mt-1.5 w-5 h-5 rounded-full border-2 border-gray-400 
+                           hover:border-white flex items-center justify-center 
+                           transition-all hover:scale-110 focus:outline-none 
+                           group relative"
+                >
+                  <CheckIcon 
+                    className="w-4 h-4 text-white transform scale-0 
+                             group-hover:scale-75 transition-transform absolute" 
+                  />
+                </button>
+                <div className="flex-1 transform-gpu transition-all duration-300">
                   <div className="flex items-center gap-2">
-                    <span className={`text-white text-lg ${task.completed ? 'line-through opacity-50' : ''}`}>
+                    <span 
+                      className={`text-lg ${task.completed ? 'line-through opacity-50' : ''}`}
+                      style={{ color: task.color || '#fff' }}
+                    >
                       {task.text}
                     </span>
                     {task.priority && (
@@ -258,15 +275,24 @@ export default function Tasks() {
                 {completedTasks.map((task) => (
                   <div key={task.id} className="bg-gray-800/30 rounded-lg p-4 shadow-lg">
                     <div className="flex items-start gap-4">
-                      <input
-                        type="checkbox"
-                        checked={true}
-                        onChange={() => handleTaskCompletion(task)}
-                        className="mt-1.5 rounded border-gray-600 checked:bg-gray-600"
-                      />
-                      <div className="flex-1">
+                      <button
+                        onClick={() => handleTaskCompletion(task)}
+                        className="custom-checkbox mt-1.5 w-5 h-5 rounded-full border-2 border-gray-400 
+                                 hover:border-white flex items-center justify-center 
+                                 transition-all hover:scale-110 focus:outline-none 
+                                 group relative"
+                      >
+                        <CheckIcon 
+                          className="w-4 h-4 text-white transform scale-0 
+                                   group-hover:scale-75 transition-transform absolute" 
+                        />
+                      </button>
+                      <div className="flex-1 transform-gpu transition-all duration-300">
                         <div className="flex items-center gap-2">
-                          <span className={`text-white text-lg ${task.completed ? 'line-through opacity-50' : ''}`}>
+                          <span 
+                            className={`text-lg ${task.completed ? 'line-through opacity-50' : ''}`}
+                            style={{ color: task.color || '#fff' }}
+                          >
                             {task.text}
                           </span>
                           {task.priority && (
