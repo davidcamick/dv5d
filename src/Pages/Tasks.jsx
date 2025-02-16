@@ -16,6 +16,76 @@ const WORKER_URL = 'https://dv5d-tasks.accounts-abd.workers.dev';
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 1000;
 
+// Add this helper function
+const parseTimestamp = (timestamp) => {
+  if (!timestamp) return null;
+  // Handle both string and number timestamps
+  const parsedTimestamp = typeof timestamp === 'string' ? parseInt(timestamp) : timestamp;
+  if (isNaN(parsedTimestamp)) return null;
+  return parsedTimestamp;
+};
+
+const formatDateHeader = (timestamp) => {
+  if (!timestamp) return 'No date';
+  
+  const date = new Date(timestamp);
+  const today = new Date();
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  
+  if (date.toDateString() === today.toDateString()) {
+    return 'Today';
+  } else if (date.toDateString() === tomorrow.toDateString()) {
+    return 'Tomorrow';
+  } else {
+    // For this week, show day name. For future dates, show full date
+    const diffDays = Math.floor((date - today) / (1000 * 60 * 60 * 24));
+    if (diffDays < 7) {
+      return date.toLocaleDateString('en-US', { weekday: 'long' });
+    }
+    return date.toLocaleDateString('en-US', { 
+      weekday: 'long',
+      month: 'long',
+      day: 'numeric'
+    });
+  }
+};
+
+// Update the groupTasksByDate function
+const groupTasksByDate = (tasks) => {
+  const groups = new Map();
+  
+  // First, group tasks with dates
+  const datedTasks = tasks.filter(task => task.due_date);
+  datedTasks.forEach(task => {
+    const dateHeader = formatDateHeader(task.due_date);
+    if (!groups.has(dateHeader)) {
+      groups.set(dateHeader, []);
+    }
+    groups.get(dateHeader).push(task);
+  });
+  
+  // Then add tasks with no date at the end
+  const noDateTasks = tasks.filter(task => !task.due_date);
+  if (noDateTasks.length > 0) {
+    groups.set('No date', noDateTasks);
+  }
+  
+  // Convert to array and sort date groups chronologically, keeping "No date" at the end
+  const sortedEntries = Array.from(groups.entries()).sort((a, b) => {
+    if (a[0] === 'No date') return 1;
+    if (b[0] === 'No date') return -1;
+    
+    // Get first task from each group to compare dates
+    const aDate = a[1][0]?.due_date;
+    const bDate = b[1][0]?.due_date;
+    
+    return aDate - bDate;
+  });
+  
+  return new Map(sortedEntries);
+};
+
 export default function Tasks() {
   const [tasks, setTasks] = useState([]);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
@@ -40,16 +110,28 @@ export default function Tasks() {
   }, [tasks]);
 
   const handleSort = (field) => {
-    setSortConfig(prev => ({
-      field: field,
-      direction: prev.field === field 
-        ? prev.direction === 'asc'
-          ? 'desc'
-          : prev.direction === 'desc'
-            ? null
-            : 'asc'
-        : 'asc'
-    }));
+    setSortConfig(prev => {
+      // For date sorting: toggle between 'date' and null, always ascending
+      if (field === 'date') {
+        return {
+          field: prev.field === 'date' ? null : 'date',
+          direction: 'asc'
+        };
+      }
+      
+      // For priority sorting: cycle through asc -> desc -> off
+      if (field === 'priority') {
+        if (prev.field !== 'priority') {
+          return { field: 'priority', direction: 'asc' };
+        }
+        if (prev.direction === 'asc') {
+          return { field: 'priority', direction: 'desc' };
+        }
+        return { field: null, direction: null };
+      }
+
+      return prev;
+    });
   };
 
   const getSortedTasks = (tasks) => {
@@ -57,11 +139,26 @@ export default function Tasks() {
     
     return [...tasks].sort((a, b) => {
       if (sortConfig.field === 'date') {
-        const aDate = a.dueDate || a.createdAt;
-        const bDate = b.dueDate || b.createdAt;
-        return sortConfig.direction === 'asc' 
-          ? aDate - bDate 
-          : bDate - aDate;
+        const aHasDate = Boolean(a.due_date);
+        const bHasDate = Boolean(b.due_date);
+        
+        // Always keep tasks with dates at the top
+        if (aHasDate && !bHasDate) return -1;
+        if (!aHasDate && bHasDate) return 1;
+        
+        // If both have dates, sort by date first
+        if (aHasDate && bHasDate) {
+          if (a.due_date === b.due_date) {
+            // If dates are equal, sort by priority (high to low)
+            const priorities = { high: 3, medium: 2, low: 1 };
+            return (priorities[b.priority] || 0) - (priorities[a.priority] || 0);
+          }
+          return a.due_date - b.due_date;
+        }
+        
+        // If neither has a date, sort by priority (high to low)
+        const priorities = { high: 3, medium: 2, low: 1 };
+        return (priorities[b.priority] || 0) - (priorities[a.priority] || 0);
       }
       
       if (sortConfig.field === 'priority') {
@@ -108,9 +205,7 @@ export default function Tasks() {
       setError(null);
       
       const response = await fetch(WORKER_URL);
-      if (!response.ok) {
-        throw new Error(`Server responded with ${response.status}`);
-      }
+      if (!response.ok) throw new Error(`Server responded with ${response.status}`);
       
       const serverTasks = await response.json();
       setTasks(serverTasks);
@@ -158,12 +253,17 @@ export default function Tasks() {
       const isNewTask = !taskData.id;
       newId = isNewTask ? crypto.randomUUID() : taskData.id;
       
+      // Ensure dueDate is a number
+      const dueDate = taskData.dueDate ? Number(taskData.dueDate) : null;
+      
+      // Convert camelCase to snake_case for API
       fullTaskData = {
         ...taskData,
         id: newId,
-        createdAt: isNewTask ? Date.now() : taskData.createdAt
+        created_at: isNewTask ? Date.now() : taskData.createdAt,
+        due_date: taskData.dueDate ? Number(taskData.dueDate) : null
       };
-
+      
       // Show pending state
       setPendingTasks(prev => new Map(prev).set(newId, fullTaskData));
       
@@ -389,9 +489,12 @@ export default function Tasks() {
   }
 
   const formatDateTime = (timestamp) => {
-    if (!timestamp) return '';
+    const parsedTimestamp = parseTimestamp(timestamp);
+    if (!parsedTimestamp) return '';
     
-    const date = new Date(Number(timestamp));
+    const date = new Date(parsedTimestamp);
+    if (isNaN(date.getTime())) return '';
+    
     const today = new Date();
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
@@ -405,10 +508,18 @@ export default function Tasks() {
       dateStr = date.toLocaleDateString();
     }
 
-    return `${dateStr} at ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return `${dateStr} at ${timeStr}`;
   };
 
   const TaskItem = ({ task, index, ...props }) => {
+    // Convert snake_case to camelCase for task properties
+    const normalizedTask = {
+      ...task,
+      dueDate: task.due_date,
+      createdAt: task.created_at
+    };
+    
     const [isHovered, setIsHovered] = useState(false);
     const [hasBeenHovered, setHasBeenHovered] = useState(false);
 
@@ -428,14 +539,12 @@ export default function Tasks() {
           onMouseEnter={handleMouseEnter}
         >
           <div className="relative z-10">
-            {/* Existing task content */}
             <div className="flex items-start gap-4">
               <button
                 onClick={() => handleTaskCompletion(task)}
                 className="custom-checkbox mt-1.5 w-5 h-5 rounded-full border-2 border-gray-400 
                          hover:border-white flex items-center justify-center 
-                         transition-all hover:scale-110 focus:outline-none 
-                         group relative"
+                         transition-all hover:scale-110 focus:outline-none group relative"
               >
                 <CheckIcon 
                   className="w-4 h-4 text-white transform scale-0 
@@ -446,7 +555,7 @@ export default function Tasks() {
                 <div className="flex items-center gap-2">
                   <span 
                     className={`text-lg ${task.completed ? 'line-through opacity-50' : ''}`}
-                    style={{ color: task.color || '#fff' }}
+                    style={{ color: task.color || '#fff' }} 
                   >
                     {task.text}
                   </span>
@@ -460,15 +569,13 @@ export default function Tasks() {
                     </span>
                   )}
                 </div>
-
                 {/* Fix the date display logic here */}
-                {typeof task.dueDate === 'number' && (
+                {normalizedTask.dueDate && (
                   <div className="flex items-center gap-1 text-gray-400 text-sm mt-1">
                     <CalendarIcon className="w-4 h-4" />
-                    {formatDateTime(task.dueDate)}
+                    <span>{formatDateTime(normalizedTask.dueDate)}</span>
                   </div>
                 )}
-
                 {task.tags?.length > 0 && (
                   <div className="flex items-center gap-2 mt-2">
                     <TagIcon className="w-4 h-4 text-gray-400" />
@@ -479,7 +586,6 @@ export default function Tasks() {
                     ))}
                   </div>
                 )}
-
                 {task.links?.map(link => (
                   <a
                     key={link.url}
@@ -491,7 +597,6 @@ export default function Tasks() {
                     {link.url}
                   </a>
                 ))}
-
                 {task.notes && (
                   <p className="mt-2 text-gray-400 text-sm whitespace-pre-wrap">
                     {task.notes}
@@ -502,13 +607,13 @@ export default function Tasks() {
               <div className="flex gap-2">
                 <button
                   onClick={() => openEditor(task)}
-                  className="p-2 text-gray-400 hover:text-white rounded-lg hover:bg-gray-700/50"
+                  className="p-2 text-gray-400 hover:text-white rounded-lg hover:bg-gray-700/50" 
                 >
                   <PencilIcon className="w-5 h-5" />
                 </button>
                 <button
                   onClick={() => deleteTask(task.id)}
-                  className="p-2 text-red-400 hover:text-red-500 rounded-lg hover:bg-gray-700/50"
+                  className="p-2 text-red-400 hover:text-red-500 rounded-lg hover:bg-gray-700/50" 
                 >
                   ×
                 </button>
@@ -519,6 +624,72 @@ export default function Tasks() {
       </div>
     );
   };
+
+  const TaskGroup = ({ tasks, showDateHeaders }) => {
+    if (!showDateHeaders) {
+      return tasks.map((task, index) => (
+        <TaskItem key={task.id} task={task} index={index} />
+      ));
+    }
+
+    const groups = groupTasksByDate(tasks);
+    return Array.from(groups.entries()).map(([dateHeader, groupTasks]) => (
+      <div key={dateHeader} className="mb-6 last:mb-0">
+        <div className="flex items-center gap-2 mb-2">
+          <div className="h-px flex-1 bg-gray-700/50"></div>
+          <h3 className="text-sm font-medium text-gray-400 px-2">{dateHeader}</h3>
+          <div className="h-px flex-1 bg-gray-700/50"></div>
+        </div>
+        <div className="space-y-4">
+          {groupTasks.map((task, index) => (
+            <TaskItem key={task.id} task={task} index={index} />
+          ))}
+        </div>
+      </div>
+    ));
+  };
+
+  const Controls = () => (
+    <div className="flex flex-wrap gap-4 mb-4">
+      <button
+        onClick={handleManualRefresh}
+        className={`p-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-700/50 transition-all
+          ${isRefreshing ? 'animate-spin text-blue-400' : ''}`}
+        disabled={isRefreshing}
+      >
+        <ArrowPathIcon className="w-5 h-5" />
+      </button>
+      
+      {/* Date button - no direction indicator */}
+      <button
+        onClick={() => handleSort('date')}
+        className={`px-3 py-1 rounded-lg flex items-center gap-1 ${
+          sortConfig.field === 'date'
+            ? 'bg-blue-500 text-white'
+            : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+        }`}
+      >
+        Date
+      </button>
+      
+      {/* Priority button - with direction indicator */}
+      <button
+        onClick={() => handleSort('priority')}
+        className={`px-3 py-1 rounded-lg flex items-center gap-1 ${
+          sortConfig.field === 'priority'
+            ? 'bg-blue-500 text-white'
+            : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+        }`}
+      >
+        Priority
+        {sortConfig.field === 'priority' && (
+          sortConfig.direction === 'asc' 
+            ? <ArrowUpIcon className="w-4 h-4" /> 
+            : <ArrowDownIcon className="w-4 h-4" />
+        )}
+      </button>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 relative overflow-hidden">
@@ -544,7 +715,7 @@ export default function Tasks() {
               Your Tasks
             </AuroraText>
           </div>
-          <button
+          <button 
             onClick={() => openEditor()}
             className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
           >
@@ -553,46 +724,7 @@ export default function Tasks() {
         </div>
 
         {/* Controls */}
-        <div className="flex flex-wrap gap-4 mb-4">
-          <button
-            onClick={handleManualRefresh}
-            className={`p-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-700/50 transition-all
-              ${isRefreshing ? 'animate-spin text-blue-400' : ''}`}
-            disabled={isRefreshing}
-          >
-            <ArrowPathIcon className="w-5 h-5" />
-          </button>
-          
-          <button
-            onClick={() => handleSort('date')}
-            className={`px-3 py-1 rounded-lg flex items-center gap-1 ${
-              sortConfig.field === 'date' && sortConfig.direction
-                ? 'bg-blue-500 text-white'
-                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-            }`}
-          >
-            Date
-            {sortConfig.field === 'date' && sortConfig.direction && (
-              sortConfig.direction === 'asc' ? <ArrowUpIcon className="w-4 h-4" /> :
-              <ArrowDownIcon className="w-4 h-4" />
-            )}
-          </button>
-          
-          <button
-            onClick={() => handleSort('priority')}
-            className={`px-3 py-1 rounded-lg flex items-center gap-1 ${
-              sortConfig.field === 'priority' && sortConfig.direction
-                ? 'bg-blue-500 text-white'
-                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-            }`}
-          >
-            Priority
-            {sortConfig.field === 'priority' && sortConfig.direction && (
-              sortConfig.direction === 'asc' ? <ArrowUpIcon className="w-4 h-4" /> :
-              <ArrowDownIcon className="w-4 h-4" />
-            )}
-          </button>
-        </div>
+        <Controls />
 
         {/* Tags section */}
         {availableTags.length > 0 && (
@@ -615,14 +747,12 @@ export default function Tasks() {
 
         {/* Active tasks */}
         <div className="space-y-4 mb-8 transition-all">
-          {activeTasks.map((task, index) => (
-            <TaskItem 
-              key={task.id} 
-              task={task}
-              index={index}
+          {activeTasks.length > 0 ? (
+            <TaskGroup 
+              tasks={activeTasks} 
+              showDateHeaders={sortConfig.field === 'date'} 
             />
-          ))}
-          {activeTasks.length === 0 && (
+          ) : (
             <div className="text-center py-8 text-gray-400">
               No active tasks {selectedTags.length > 0 ? 'with selected tags' : ''}
             </div>
@@ -642,12 +772,12 @@ export default function Tasks() {
                 <span>Completed Tasks ({completedTasks.length})</span>
               </button>
             </div>
-
             {showCompleted && (
               <div className="mt-4 space-y-4 opacity-75">
-                {completedTasks.map((task) => (
-                  <TaskItem key={task.id} task={task} />
-                ))}
+                <TaskGroup 
+                  tasks={completedTasks} 
+                  showDateHeaders={sortConfig.field === 'date'} 
+                />
               </div>
             )}
           </>
@@ -676,7 +806,7 @@ export default function Tasks() {
         )}
 
         {isEditorOpen && (
-          <TaskEditor
+          <TaskEditor 
             task={editingTask}
             availableTags={availableTags}
             onSave={handleSaveTask}

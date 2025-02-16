@@ -7,14 +7,20 @@ import "react-datepicker/dist/react-datepicker.css";
 const WORKER_URL = 'https://dv5d-tasks.accounts-abd.workers.dev';
 
 export default function TaskEditor({ task, availableTags = [], onSave, onClose }) {
-  const [editedTask, setEditedTask] = useState(task || {
-    text: '',
-    dueDate: null,
-    priority: 'medium',
-    tags: [],
-    links: [],
-    color: '#1e40af',
-    notes: ''
+  const [editedTask, setEditedTask] = useState(() => {
+    const initialDate = task?.dueDate ? new Date(task.dueDate) : null;
+    console.log('Initial task:', task);
+    console.log('Initial date:', initialDate);
+    
+    return {
+      text: task?.text || '',
+      dueDate: initialDate ? initialDate.getTime() : null,
+      priority: task?.priority || 'medium',
+      tags: task?.tags || [],
+      links: task?.links || [],
+      color: task?.color || '#1e40af',
+      notes: task?.notes || ''
+    };
   });
 
   const [newTag, setNewTag] = useState('');
@@ -81,8 +87,19 @@ export default function TaskEditor({ task, availableTags = [], onSave, onClose }
     }
   };
 
+  // Update date handling
+  const handleDateChange = (date) => {
+    console.log('Setting date:', date);
+    const timestamp = date ? date.getTime() : null;
+    console.log('As timestamp:', timestamp);
+    setEditedTask(prev => ({
+      ...prev,
+      dueDate: timestamp
+    }));
+  };
+
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
       <div className="bg-gray-800 rounded-lg p-6 w-full max-w-md">
         <h2 className="text-2xl font-bold text-white mb-4">
           {task ? 'Edit Task' : 'New Task'}
@@ -102,35 +119,14 @@ export default function TaskEditor({ task, availableTags = [], onSave, onClose }
           <div className="flex gap-4">
             <div className="flex-1">
               <label className="block text-gray-400 mb-2">Due Date & Time</label>
-              <div className="flex gap-2">
-                <input
-                  type="date"
-                  value={editedTask.dueDate ? new Date(editedTask.dueDate).toISOString().split('T')[0] : ''}
-                  onChange={(e) => {
-                    const date = e.target.value ? new Date(e.target.value) : null;
-                    if (date) {
-                      // Preserve existing time if there is one
-                      const existingDate = editedTask.dueDate ? new Date(editedTask.dueDate) : new Date();
-                      date.setHours(existingDate.getHours(), existingDate.getMinutes());
-                    }
-                    setEditedTask(prev => ({ ...prev, dueDate: date ? date.getTime() : null }));
-                  }}
-                  className="bg-gray-700 text-white rounded px-3 py-2 w-full"
-                />
-                {editedTask.dueDate && (
-                  <input
-                    type="time"
-                    value={editedTask.dueDate ? new Date(editedTask.dueDate).toTimeString().slice(0, 5) : ''}
-                    onChange={(e) => {
-                      const [hours, minutes] = e.target.value.split(':');
-                      const date = new Date(editedTask.dueDate);
-                      date.setHours(hours, minutes);
-                      setEditedTask(prev => ({ ...prev, dueDate: date.getTime() }));
-                    }}
-                    className="bg-gray-700 text-white rounded px-3 py-2"
-                  />
-                )}
-              </div>
+              <DatePicker
+                selected={editedTask.dueDate ? new Date(editedTask.dueDate) : null}
+                onChange={handleDateChange}
+                showTimeSelect
+                dateFormat="MMMM d, yyyy h:mm aa"
+                className="w-full px-4 py-2 bg-gray-700 text-white rounded-lg"
+                placeholderText="Select date and time"
+              />
             </div>
 
             <div>
