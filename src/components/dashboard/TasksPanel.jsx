@@ -68,12 +68,21 @@ export default function TasksPanel() {
             upcomingTasks.map(task => (
               <div key={task.id} className="p-3 bg-gray-700/50 rounded-lg">
                 <div className="flex justify-between items-center">
-                  <span>{task.text}</span>
-                  {task.dueDate && (
-                    <span className="text-sm text-gray-300">
-                      {new Date(task.dueDate).toLocaleDateString()}
+                  <span className="text-white">{task.text}</span>
+                  <div className="flex items-center gap-2">
+                    <span className={`px-2 py-0.5 text-xs text-white rounded ${
+                      task.priority === 'high' ? 'bg-red-500' :
+                      task.priority === 'medium' ? 'bg-yellow-500' :
+                      'bg-blue-500'
+                    }`}>
+                      {task.priority}
                     </span>
-                  )}
+                    {task.dueDate && (
+                      <span className="text-sm text-gray-300">
+                        {new Date(task.dueDate).toLocaleDateString()}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
             ))

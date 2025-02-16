@@ -389,7 +389,9 @@ export default function Tasks() {
   }
 
   const formatDateTime = (timestamp) => {
-    const date = new Date(timestamp);
+    if (!timestamp) return '';
+    
+    const date = new Date(Number(timestamp));
     const today = new Date();
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
@@ -459,7 +461,8 @@ export default function Tasks() {
                   )}
                 </div>
 
-                {task.dueDate && (
+                {/* Fix the date display logic here */}
+                {typeof task.dueDate === 'number' && (
                   <div className="flex items-center gap-1 text-gray-400 text-sm mt-1">
                     <CalendarIcon className="w-4 h-4" />
                     {formatDateTime(task.dueDate)}
