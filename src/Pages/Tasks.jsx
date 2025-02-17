@@ -6,12 +6,13 @@ import {
   CalendarDaysIcon as CalendarIcon, TagIcon,
   ChevronDownIcon, ChevronUpIcon, CheckIcon,
   ArrowUpIcon, ArrowDownIcon, ArrowPathIcon,
-  ArrowLeftIcon
+  ArrowLeftIcon, PlusCircleIcon
 } from '@heroicons/react/24/outline';
 import { AnimatedGridPattern } from '../components/ui/AnimatedGridPattern';
 import { AuroraText } from '../components/ui/AuroraText';
 import { Link } from 'react-router-dom';
 import { PRESET_COLORS } from '../constants/colors';
+import { Popover } from '@headlessui/react';
 
 const WORKER_URL = 'https://dv5d-tasks.accounts-abd.workers.dev';
 const MAX_RETRIES = 3;
@@ -514,6 +515,130 @@ export default function Tasks() {
   };
 
   const TaskItem = ({ task, index }) => {
+    const [isUpdating, setIsUpdating] = useState(false);
+    const [newTag, setNewTag] = useState('');
+  
+    const handleAddTag = async (tagToAdd) => {
+      setIsUpdating(true);
+      const updatedTask = {
+        ...task,
+        tags: [...(task.tags || []), tagToAdd]
+      };
+  
+      try {
+        const response = await fetch(`${WORKER_URL}/${task.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(updatedTask)
+        });
+  
+        if (!response.ok) throw new Error('Failed to update task');
+        await fetchTasks();
+      } catch (error) {
+        console.error('Error updating task:', error);
+        setError('Failed to update tags. Please try again.');
+      } finally {
+        setIsUpdating(false);
+      }
+    };
+
+    const handleRemoveTag = async (tagToRemove) => {
+      setIsUpdating(true);
+      const updatedTask = {
+        ...task,
+        tags: task.tags?.filter(tag => tag !== tagToRemove) || []
+      };
+  
+      try {
+        const response = await fetch(`${WORKER_URL}/${task.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(updatedTask)
+        });
+  
+        if (!response.ok) throw new Error('Failed to update task');
+        await fetchTasks();
+      } catch (error) {
+        console.error('Error updating task:', error);
+        setError('Failed to remove tag. Please try again.');
+      } finally {
+        setIsUpdating(false);
+      }
+    };
+  
+    const TagsPopover = () => (
+      <Popover className="relative">
+        <Popover.Button
+          className={`${task.tags?.length > 0 
+            ? 'hover:bg-gray-600/10' // Almost invisible background, slight hover effect
+            : 'px-2 py-0.5 bg-gray-700 rounded-full hover:bg-gray-600'
+          } text-xs text-gray-300 transition-colors focus:outline-none focus:ring-2 
+            focus:ring-blue-500 focus:ring-opacity-50`}
+          disabled={isUpdating}
+        >
+          {task.tags?.length > 0 ? (
+            <div className="flex flex-wrap gap-1">
+              {task.tags.map(tag => (
+                <span key={tag} className="px-2 py-0.5 bg-gray-600 rounded-full">
+                  {tag}
+                </span>
+              ))}
+            </div>
+          ) : (
+            'No Tags'
+          )}
+        </Popover.Button>
+    
+        <Popover.Panel
+          className="absolute z-[99999] w-64"
+          style={{
+            top: 'calc(100% + 0.5rem)',
+            right: '0',
+          }}
+        >
+          <div 
+            className="bg-gray-800 rounded-lg shadow-lg p-4 border border-gray-700"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex flex-wrap gap-1">
+              {availableTags.map(tag => {
+                const isSelected = task.tags?.includes(tag);
+                return (
+                  <button
+                    key={tag}
+                    onClick={() => {
+                      if (isSelected) {
+                        // Remove tag
+                        handleRemoveTag(tag);
+                      } else {
+                        // Add tag
+                        handleAddTag(tag);
+                      }
+                    }}
+                    className={`px-2 py-0.5 rounded-full text-xs transition-colors
+                      ${isSelected 
+                        ? 'bg-blue-500 text-white hover:bg-blue-600' 
+                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                      }`}
+                    disabled={isUpdating}
+                  >
+                    {tag}
+                  </button>
+                );
+              })}
+            </div>
+            {availableTags.length === 0 && (
+              <span className="text-gray-400 text-xs">No tags available</span>
+            )}
+          </div>
+        </Popover.Panel>
+      </Popover>
+    );
+  
     return (
       <div className="p-1">
         <div className="relative">
@@ -532,6 +657,7 @@ export default function Tasks() {
                   />
                 </button>
                 <div className="flex-1 transform-gpu transition-all duration-300">
+                  {/* Title and Priority Section */}
                   <div className="flex items-center gap-2">
                     <span 
                       className={`text-lg ${task.completed ? 'line-through opacity-50' : ''}`}
@@ -549,54 +675,59 @@ export default function Tasks() {
                       </span>
                     )}
                   </div>
-                  {task.due_date && (
-                    <div className="flex items-center gap-1 text-gray-400 text-sm mt-1">
-                      <CalendarIcon className="w-4 h-4" />
-                      <span>{formatDateTime(task.due_date)}</span>
-                    </div>
-                  )}
-                  {task.tags?.length > 0 && (
-                    <div className="flex items-center gap-2 mt-2">
-                      <TagIcon className="w-4 h-4 text-gray-400" />
-                      {task.tags.map(tag => (
-                        <span key={tag} className="px-2 py-0.5 bg-gray-700 rounded-full text-xs text-white">
-                          {tag}
+
+                  {/* Divider Line */}
+                  <div className="h-px bg-gray-700/50 my-2"></div>
+
+                  {/* Content Below Divider */}
+                  <div className="flex justify-between gap-4">
+                    {/* Left Side Content */}
+                    <div className="flex-1 flex flex-col gap-2">
+                      <div className="flex items-center gap-1">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-700 rounded-full text-xs text-gray-300">
+                          <CalendarIcon className="w-4 h-4" />
+                          {task.due_date ? formatDateTime(task.due_date) : 'No Date'}
                         </span>
-                      ))}
+                      </div>
+                      <div className="flex items-start">
+                        <span className="px-2 py-0.5 bg-gray-700 rounded-full text-xs text-gray-300">
+                          {task.notes ? task.notes : 'No Notes'}
+                        </span>
+                      </div>
                     </div>
-                  )}
-                  {task.links?.map(link => (
-                    <a
-                      key={link.url}
-                      href={link.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="mt-2 block p-2 rounded bg-gray-700/50 hover:bg-gray-700/70 text-blue-400 text-sm"
-                    >
-                      {link.url}
-                    </a>
-                  ))}
-                  {task.notes && (
-                    <p className="mt-2 text-gray-400 text-sm whitespace-pre-wrap">
-                      {task.notes}
-                    </p>
-                  )}
+
+                    {/* Right Side Content */}
+                    <div className="flex flex-col items-end gap-2">
+                      <TagsPopover />
+                      <div className="flex flex-col items-end gap-1">
+                        {task.links?.length > 0 ? (
+                          task.links.map(link => (
+                            <a
+                              key={link.url}
+                              href={link.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-right block p-2 rounded bg-gray-700/50 hover:bg-gray-700/70 text-blue-400 text-sm"
+                            >
+                              {link.url}
+                            </a>
+                          ))
+                        ) : (
+                          <span className="text-right block p-2 rounded bg-gray-700/50 text-gray-300 text-sm">
+                            No Links
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => openEditor(task)}
-                    className="p-2 text-gray-400 hover:text-white rounded-lg hover:bg-gray-700/50" 
-                  >
-                    <PencilIcon className="w-5 h-5" />
-                  </button>
-                  <button
-                    onClick={() => deleteTask(task.id)}
-                    className="p-2 text-red-400 hover:text-red-500 rounded-lg hover:bg-gray-700/50" 
-                  >
-                    ×
-                  </button>
-                </div>
+                <button
+                  onClick={() => deleteTask(task.id)}
+                  className="p-2 text-red-400 hover:text-red-500 rounded-lg hover:bg-gray-700/50" 
+                >
+                  ×
+                </button>
               </div>
             </div>
           </div>
