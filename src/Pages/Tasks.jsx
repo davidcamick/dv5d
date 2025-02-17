@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { getUserEmail } from '../utils/auth';
 import TaskEditor from '../components/ui/TaskEditor';
 import { Dialog } from '../components/ui/Dialog';  // Add this import
+import { Calendar } from '../components/ui/Calendar';
 import { 
   PlusIcon, PencilSquareIcon as PencilIcon,
   CalendarDaysIcon as CalendarIcon, TagIcon,
@@ -681,6 +682,56 @@ export default function Tasks() {
       setNewDueDate(String(timestamp));
     };
 
+    const setDateFromCalendar = (date) => {
+      // Set to noon on the selected day to avoid timezone issues
+      const selectedDate = new Date(date);
+      selectedDate.setHours(12, 0, 0, 0);
+      setNewDueDate(String(selectedDate.getTime()));
+    };
+
+    const handleQuickDateSet = async (preset) => {
+      let newTimestamp;
+      
+      if (preset === 'remove') {
+        newTimestamp = null;
+      } else {
+        const now = new Date();
+        if (preset === 'tomorrow') {
+          now.setDate(now.getDate() + 1);
+        }
+        newTimestamp = now.getTime();
+      }
+  
+      setNewDueDate(newTimestamp ? String(newTimestamp) : '');
+      
+      // Auto-save
+      const updatedTask = {
+        ...task,
+        dueDate: newTimestamp,  // Use camelCase here
+        due_date: newTimestamp  // Keep snake_case for API compatibility
+      };
+  
+      setIsUpdating(true);
+      try {
+        const response = await fetch(`${WORKER_URL}/${task.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(updatedTask)
+        });
+  
+        if (!response.ok) throw new Error('Failed to update task');
+        await fetchTasks();
+        setEditingDate(false); // Close dialog on success
+      } catch (error) {
+        console.error('Error updating task:', error);
+        setError('Failed to update date. Please try again.');
+      } finally {
+        setIsUpdating(false);
+      }
+    };
+
     return (
       <div className="p-1">
         <div className="relative">
@@ -784,42 +835,44 @@ export default function Tasks() {
         >
           <h3 className="text-lg font-semibold mb-4">Edit Due Date</h3>
           <div className="space-y-4">
-            {/* Quick preset buttons */}
+            {/* Quick preset buttons - now with loading state */}
             <div className="flex gap-2">
               <button 
-                onClick={() => setDateFromPreset('today')}
-                className="flex-1 px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm font-medium"
+                onClick={() => handleQuickDateSet('today')}
+                disabled={isUpdating}
+                className="flex-1 px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg 
+                         text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Set to Today
               </button>
               <button 
-                onClick={() => setDateFromPreset('tomorrow')}
-                className="flex-1 px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm font-medium"
+                onClick={() => handleQuickDateSet('tomorrow')}
+                disabled={isUpdating}
+                className="flex-1 px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg 
+                         text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Set to Tomorrow
               </button>
             </div>
-            
-            {/* Divider with text */}
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-700"></div>
-              </div>
-              <div className="relative flex justify-center">
-                <span className="px-2 bg-gray-900 text-sm text-gray-400">
-                  or enter timestamp
-                </span>
-              </div>
+
+            {/* Calendar */}
+            <div className="py-2">
+              <Calendar 
+                selected={newDueDate ? new Date(Number(newDueDate)) : null}
+                onSelect={setDateFromCalendar}
+              />
             </div>
 
-            <input 
-              type="text" 
-              value={newDueDate} 
-              onChange={e => setNewDueDate(e.target.value)}
-              className="w-full px-4 py-2 bg-gray-800 text-white rounded-lg border border-gray-700"
-              placeholder="Enter timestamp"
-              autoFocus
-            />
+            {/* Remove date button */}
+            <button 
+              onClick={() => handleQuickDateSet('remove')}
+              disabled={isUpdating}
+              className="w-full px-3 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 
+                       rounded-lg text-sm font-medium border border-red-500/20
+                       disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Remove Date
+            </button>
             
             {/* Show preview of selected date */}
             {newDueDate && (
@@ -828,22 +881,23 @@ export default function Tasks() {
               </div>
             )}
 
-            <div className="flex justify-end gap-3">
-              <button 
-                onClick={() => setEditingDate(false)}
-                className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600"
-                disabled={isUpdating}
-              >
-                Cancel
-              </button>
-              <button 
-                onClick={handleSaveDate}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-500"
-                disabled={isUpdating}
-              >
-                Save
-              </button>
-            </div>
+            {/* Save/Cancel only shown for calendar selection */}
+            {!isUpdating && (
+              <div className="flex justify-end gap-3">
+                <button 
+                  onClick={() => setEditingDate(false)}
+                  className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={handleSaveDate}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-500"
+                >
+                  Save
+                </button>
+              </div>
+            )}
           </div>
         </Dialog>
       </div>
