@@ -518,10 +518,15 @@ export default function Tasks() {
 
   const TaskItem = ({ task, index }) => {
     const [isUpdating, setIsUpdating] = useState(false);
-    const [newTag, setNewTag] = useState('');
-    // Update state: ensure newDueDate is always a string
     const [editingDate, setEditingDate] = useState(false);
+    const [editingTags, setEditingTags] = useState(false);
+    const [editingNotes, setEditingNotes] = useState(false);
+    const [editingPriority, setEditingPriority] = useState(false);
+    const [editingLinks, setEditingLinks] = useState(false);
     const [newDueDate, setNewDueDate] = useState(task.due_date ? String(task.due_date) : '');
+    const [newNotes, setNewNotes] = useState(task.notes || '');
+    const [newLink, setNewLink] = useState('');
+    const [newTag, setNewTag] = useState(''); // Add this line
 
     const handleSaveDate = async () => {
       setIsUpdating(true);
@@ -552,10 +557,14 @@ export default function Tasks() {
     };
 
     const handleAddTag = async (tagToAdd) => {
+      if (!tagToAdd.trim()) return;
+      
       setIsUpdating(true);
       const updatedTask = {
         ...task,
-        tags: [...(task.tags || []), tagToAdd]
+        tags: [...(task.tags || []), tagToAdd.trim()],
+        due_date: task.due_date,  // Preserve date
+        dueDate: task.due_date    // Keep both formats
       };
   
       try {
@@ -569,6 +578,8 @@ export default function Tasks() {
   
         if (!response.ok) throw new Error('Failed to update task');
         await fetchTasks();
+        setNewTag('');  // Clear input on success
+        
       } catch (error) {
         console.error('Error updating task:', error);
         setError('Failed to update tags. Please try again.');
@@ -576,12 +587,14 @@ export default function Tasks() {
         setIsUpdating(false);
       }
     };
-
+  
     const handleRemoveTag = async (tagToRemove) => {
       setIsUpdating(true);
       const updatedTask = {
         ...task,
-        tags: task.tags?.filter(tag => tag !== tagToRemove) || []
+        tags: task.tags?.filter(tag => tag !== tagToRemove) || [],
+        due_date: task.due_date,  // Preserve date
+        dueDate: task.due_date    // Keep both formats
       };
   
       try {
@@ -603,75 +616,29 @@ export default function Tasks() {
       }
     };
   
-    const TagsPopover = () => (
-      <Popover className="relative">
-        <Popover.Button
-          className={`${task.tags?.length > 0 
-            ? 'hover:bg-gray-600/10' // Almost invisible background, slight hover effect
-            : 'px-2 py-0.5 bg-gray-700 rounded-full hover:bg-gray-600'
-          } text-xs text-gray-300 transition-colors focus:outline-none focus:ring-2 
-            focus:ring-blue-500 focus:ring-opacity-50`}
-          disabled={isUpdating}
-        >
-          {task.tags?.length > 0 ? (
-            <div className="flex flex-wrap gap-1">
-              {task.tags.map(tag => (
-                <span key={tag} className="px-2 py-0.5 bg-gray-600 rounded-full">
-                  {tag}
-                </span>
-              ))}
-            </div>
-          ) : (
-            'No Tags'
-          )}
-        </Popover.Button>
-    
-        <Popover.Panel
-          className="absolute z-[99999] w-64"
-          style={{
-            top: 'calc(100% + 0.5rem)',
-            right: '0',
-          }}
-        >
-          <div 
-            className="bg-gray-800 rounded-lg shadow-lg p-4 border border-gray-700"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex flex-wrap gap-1">
-              {availableTags.map(tag => {
-                const isSelected = task.tags?.includes(tag);
-                return (
-                  <button
-                    key={tag}
-                    onClick={() => {
-                      if (isSelected) {
-                        // Remove tag
-                        handleRemoveTag(tag);
-                      } else {
-                        // Add tag
-                        handleAddTag(tag);
-                      }
-                    }}
-                    className={`px-2 py-0.5 rounded-full text-xs transition-colors
-                      ${isSelected 
-                        ? 'bg-blue-500 text-white hover:bg-blue-600' 
-                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                      }`}
-                    disabled={isUpdating}
-                  >
-                    {tag}
-                  </button>
-                );
-              })}
-            </div>
-            {availableTags.length === 0 && (
-              <span className="text-gray-400 text-xs">No tags available</span>
-            )}
+    // Replace the TagsPopover component with this new version
+    const TagsDisplay = () => (
+      <span
+        onClick={() => setEditingTags(true)}
+        className={`${task.tags?.length > 0 
+          ? 'hover:bg-gray-600/10'
+          : 'px-2 py-0.5 bg-gray-700 rounded-full hover:bg-gray-600'
+        } text-xs text-gray-300 transition-colors cursor-pointer`}
+      >
+        {task.tags?.length > 0 ? (
+          <div className="flex flex-wrap gap-1">
+            {task.tags.map(tag => (
+              <span key={tag} className="px-2 py-0.5 bg-gray-600 rounded-full">
+                {tag}
+              </span>
+            ))}
           </div>
-        </Popover.Panel>
-      </Popover>
+        ) : (
+          'No Tags'
+        )}
+      </span>
     );
-  
+
     const setDateFromPreset = (preset) => {
       const now = new Date();
       if (preset === 'tomorrow') {
@@ -732,6 +699,123 @@ export default function Tasks() {
       }
     };
 
+    const handleSaveNotes = async () => {
+      setIsUpdating(true);
+      const updatedTask = {
+        ...task,
+        notes: newNotes,
+        due_date: task.due_date,  // Preserve date
+        dueDate: task.due_date    // Preserve both formats
+      };
+
+      try {
+        const response = await fetch(`${WORKER_URL}/${task.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updatedTask)
+        });
+
+        if (!response.ok) throw new Error('Failed to update task');
+        await fetchTasks();
+        setEditingNotes(false);
+      } catch (error) {
+        setError('Failed to update notes. Please try again.');
+      } finally {
+        setIsUpdating(false);
+      }
+    };
+
+    const handleSavePriority = async (newPriority) => {
+      setIsUpdating(true);
+      const updatedTask = {
+        ...task,
+        priority: newPriority,
+        due_date: task.due_date,  // Explicitly keep the date
+        dueDate: task.due_date    // Keep both formats for consistency
+      };
+
+      try {
+        const response = await fetch(`${WORKER_URL}/${task.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updatedTask)
+        });
+
+        if (!response.ok) throw new Error('Failed to update task');
+        await fetchTasks();
+      } catch (error) {
+        setError('Failed to update priority. Please try again.');
+      } finally {
+        setIsUpdating(false);
+        setEditingPriority(false);
+      }
+    };
+
+    const formatUrl = (url) => {
+      // Add https:// if no protocol is specified
+      if (!/^https?:\/\//i.test(url)) {
+        return `https://${url}`;
+      }
+      return url;
+    };
+
+    const handleLinkClick = (url) => {
+      window.open(formatUrl(url), '_blank');
+    };
+
+    const handleAddLink = async () => {
+      if (!newLink.trim()) return;
+      
+      setIsUpdating(true);
+      const updatedTask = {
+        ...task,
+        links: [...(task.links || []), { url: newLink.trim() }],
+        due_date: task.due_date,  // Preserve date
+        dueDate: task.due_date    // Preserve both formats
+      };
+  
+      try {
+        const response = await fetch(`${WORKER_URL}/${task.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updatedTask)
+        });
+  
+        if (!response.ok) throw new Error('Failed to update task');
+        await fetchTasks();
+        setNewLink('');  // Clear input on success
+      } catch (error) {
+        setError('Failed to add link. Please try again.');
+      } finally {
+        setIsUpdating(false);
+      }
+    };
+  
+    const handleRemoveLink = async (urlToRemove) => {
+      setIsUpdating(true);
+      const updatedTask = {
+        ...task,
+        links: task.links?.filter(link => link.url !== urlToRemove) || [],
+        due_date: task.due_date,  // Preserve date
+        dueDate: task.due_date    // Preserve both formats
+      };
+  
+      try {
+        const response = await fetch(`${WORKER_URL}/${task.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updatedTask)
+        });
+  
+        if (!response.ok) throw new Error('Failed to update task');
+        await fetchTasks();
+      } catch (error) {
+        setError('Failed to remove link. Please try again.');
+      } finally {
+        setIsUpdating(false);
+      }
+    };
+
     return (
       <div className="p-1">
         <div className="relative">
@@ -758,15 +842,16 @@ export default function Tasks() {
                     >
                       {task.text}
                     </span>
-                    {task.priority && (
-                      <span className={`px-2 py-0.5 rounded text-xs ${
-                        task.priority === 'high' ? 'bg-red-500' :
-                        task.priority === 'medium' ? 'bg-yellow-500' :
-                        'bg-blue-500'
-                      }`}>
-                        {task.priority}
-                      </span>
-                    )}
+                    <button
+                      onClick={() => setEditingPriority(true)}
+                      className={`px-2 py-0.5 rounded text-xs cursor-pointer transition-colors ${
+                        task.priority === 'high' ? 'bg-red-500 hover:bg-red-600' :
+                        task.priority === 'medium' ? 'bg-yellow-500 hover:bg-yellow-600' :
+                        'bg-blue-500 hover:bg-blue-600'
+                      }`}
+                    >
+                      {task.priority}
+                    </button>
                   </div>
 
                   {/* Divider Line */}
@@ -785,32 +870,44 @@ export default function Tasks() {
                           {task.due_date ? formatDateTime(task.due_date) : 'No Date'}
                         </span>
                       </div>
-                      <div className="flex items-start">
-                        <span className="px-2 py-0.5 bg-gray-700 rounded-full text-xs text-gray-300">
-                          {task.notes ? task.notes : 'No Notes'}
+                      <div 
+                        className="flex items-start"
+                        onClick={() => {
+                          setNewNotes(task.notes || '');
+                          setEditingNotes(true);
+                        }}
+                      >
+                        <span className="px-2 py-0.5 bg-gray-700 rounded-full text-xs text-gray-300 cursor-pointer">
+                          {task.notes ? task.notes : 'Add Notes...'}
                         </span>
                       </div>
                     </div>
 
                     {/* Right Side Content */}
                     <div className="flex flex-col items-end gap-2">
-                      <TagsPopover />
+                      <span 
+                        onClick={() => setEditingTags(true)}
+                        className="cursor-pointer"
+                      >
+                        <TagsDisplay />
+                      </span>
                       <div className="flex flex-col items-end gap-1">
                         {task.links?.length > 0 ? (
                           task.links.map(link => (
-                            <a
+                            <span
                               key={link.url}
-                              href={link.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-right block p-2 rounded bg-gray-700/50 hover:bg-gray-700/70 text-blue-400 text-sm"
+                              onClick={() => handleLinkClick(link.url)}
+                              className="text-right block p-2 rounded bg-gray-700/50 hover:bg-gray-700/70 text-blue-400 text-sm cursor-pointer"
                             >
                               {link.url}
-                            </a>
+                            </span>
                           ))
                         ) : (
-                          <span className="text-right block p-2 rounded bg-gray-700/50 text-gray-300 text-sm">
-                            No Links
+                          <span 
+                            className="text-right block p-2 rounded bg-gray-700/50 text-gray-300 text-sm cursor-pointer"
+                            onClick={() => setEditingLinks(true)}
+                          >
+                            Add Links...
                           </span>
                         )}
                       </div>
@@ -898,6 +995,156 @@ export default function Tasks() {
                 </button>
               </div>
             )}
+          </div>
+        </Dialog>
+        <Dialog
+          isOpen={editingTags}
+          onClose={() => setEditingTags(false)}
+          className="w-[24rem] p-6"
+        >
+          <h3 className="text-lg font-semibold mb-4">Edit Tags</h3>
+          <div className="space-y-4">
+            <div className="flex flex-wrap gap-2">
+              {task.tags?.map(tag => (
+                <span key={tag} className="px-2 py-1 bg-blue-500 text-white rounded-full text-sm">
+                  {tag}
+                  <button
+                    onClick={() => handleRemoveTag(tag)}
+                    className="ml-2 hover:text-white/75"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+            
+            {availableTags.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {availableTags
+                  .filter(tag => !task.tags?.includes(tag))
+                  .map(tag => (
+                    <button
+                      key={tag}
+                      onClick={() => handleAddTag(tag)}
+                      className="px-2 py-1 bg-gray-700 hover:bg-gray-600 text-gray-300 
+                               rounded-full text-sm transition-colors"
+                    >
+                      + {tag}
+                    </button>
+                ))}
+              </div>
+            )}
+
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={newTag}
+                onChange={e => setNewTag(e.target.value)}
+                onKeyPress={e => e.key === 'Enter' && handleAddTag(newTag)}
+                className="flex-1 px-4 py-2 bg-gray-800 text-white rounded-lg border border-gray-700"
+                placeholder="Add a new tag..."
+              />
+              <button
+                onClick={() => handleAddTag(newTag)}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg"
+              >
+                Add
+              </button>
+            </div>
+          </div>
+        </Dialog>
+        <Dialog
+          isOpen={editingNotes}
+          onClose={() => setEditingNotes(false)}
+          className="w-[24rem] p-6"
+        >
+          <h3 className="text-lg font-semibold mb-4">Edit Notes</h3>
+          <div className="space-y-4">
+            <textarea
+              value={newNotes}
+              onChange={e => setNewNotes(e.target.value)}
+              className="w-full px-4 py-2 bg-gray-800 text-white rounded-lg border border-gray-700"
+              placeholder="Add some notes..."
+              rows={4}
+              autoFocus
+            />
+            <div className="flex justify-end gap-3">
+              <button 
+                onClick={() => setEditingNotes(false)}
+                className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleSaveNotes}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-500"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </Dialog>
+        <Dialog
+          isOpen={editingPriority}
+          onClose={() => setEditingPriority(false)}
+          className="w-[24rem] p-6"
+        >
+          <h3 className="text-lg font-semibold mb-4">Set Priority</h3>
+          <div className="space-y-2">
+            {['high', 'medium', 'low'].map(priority => (
+              <button
+                key={priority}
+                onClick={() => handleSavePriority(priority)}
+                className={`w-full px-4 py-3 rounded-lg text-white capitalize transition-colors ${
+                  priority === 'high' ? 'bg-red-500 hover:bg-red-600' :
+                  priority === 'medium' ? 'bg-yellow-500 hover:bg-yellow-600' :
+                  'bg-blue-500 hover:bg-blue-600'
+                }`}
+              >
+                {priority}
+              </button>
+            ))}
+          </div>
+        </Dialog>
+        <Dialog
+          isOpen={editingLinks}
+          onClose={() => setEditingLinks(false)}
+          className="w-[24rem] p-6"
+        >
+          <h3 className="text-lg font-semibold mb-4">Edit Links</h3>
+          <div className="space-y-4">
+            {task.links?.length > 0 && (
+              <div className="space-y-2">
+                {task.links.map(link => (
+                  <div key={link.url} className="flex items-center gap-2 p-2 bg-gray-800 rounded-lg">
+                    <span className="flex-1 text-blue-400 text-sm truncate">{link.url}</span>
+                    <button
+                      onClick={() => handleRemoveLink(link.url)}
+                      className="text-red-400 hover:text-red-300"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={newLink}
+                onChange={e => setNewLink(e.target.value)}
+                onKeyPress={e => e.key === 'Enter' && handleAddLink(newLink)}
+                className="flex-1 px-4 py-2 bg-gray-800 text-white rounded-lg border border-gray-700"
+                placeholder="Add a link..."
+              />
+              <button
+                onClick={() => handleAddLink(newLink)}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg"
+              >
+                Add
+              </button>
+            </div>
           </div>
         </Dialog>
       </div>
