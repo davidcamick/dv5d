@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { getUserEmail } from '../utils/auth';
 import TaskEditor from '../components/ui/TaskEditor';
+import { Dialog } from '../components/ui/Dialog';  // Add this import
 import { 
   PlusIcon, PencilSquareIcon as PencilIcon,
   CalendarDaysIcon as CalendarIcon, TagIcon,
@@ -127,7 +128,7 @@ export default function Tasks() {
           return { field: 'priority', direction: 'asc' };
         }
         if (prev.direction === 'asc') {
-          return { field: 'priority', direction: 'desc' };
+          return { field: null, direction: null };
         }
         return { field: null, direction: null };
       }
@@ -670,6 +671,16 @@ export default function Tasks() {
       </Popover>
     );
   
+    const setDateFromPreset = (preset) => {
+      const now = new Date();
+      if (preset === 'tomorrow') {
+        now.setDate(now.getDate() + 1);
+      }
+      // Set time to current time
+      const timestamp = now.getTime();
+      setNewDueDate(String(timestamp));
+    };
+
     return (
       <div className="p-1">
         <div className="relative">
@@ -722,33 +733,6 @@ export default function Tasks() {
                           <CalendarIcon className="w-4 h-4" />
                           {task.due_date ? formatDateTime(task.due_date) : 'No Date'}
                         </span>
-                        {editingDate && (
-                          <div className="absolute z-20 mt-2 p-2 bg-gray-900 border border-gray-700 rounded">
-                            <input 
-                              type="text" 
-                              value={newDueDate} 
-                              onChange={e => setNewDueDate(e.target.value)}
-                              className="px-2 py-1 bg-gray-800 text-white rounded"
-                              placeholder="Enter timestamp"
-                            />
-                            <div className="flex gap-2 mt-2">
-                              <button 
-                                onClick={handleSaveDate}
-                                className="px-2 py-1 bg-green-600 text-white rounded"
-                                disabled={isUpdating}
-                              >
-                                Save
-                              </button>
-                              <button 
-                                onClick={() => setEditingDate(false)}
-                                className="px-2 py-1 bg-red-600 text-white rounded"
-                                disabled={isUpdating}
-                              >
-                                Cancel
-                              </button>
-                            </div>
-                          </div>
-                        )}
                       </div>
                       <div className="flex items-start">
                         <span className="px-2 py-0.5 bg-gray-700 rounded-full text-xs text-gray-300">
@@ -793,6 +777,75 @@ export default function Tasks() {
             </div>
           </div>
         </div>
+        <Dialog
+          isOpen={editingDate}
+          onClose={() => setEditingDate(false)}
+          className="w-[24rem] p-6"
+        >
+          <h3 className="text-lg font-semibold mb-4">Edit Due Date</h3>
+          <div className="space-y-4">
+            {/* Quick preset buttons */}
+            <div className="flex gap-2">
+              <button 
+                onClick={() => setDateFromPreset('today')}
+                className="flex-1 px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm font-medium"
+              >
+                Set to Today
+              </button>
+              <button 
+                onClick={() => setDateFromPreset('tomorrow')}
+                className="flex-1 px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm font-medium"
+              >
+                Set to Tomorrow
+              </button>
+            </div>
+            
+            {/* Divider with text */}
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-700"></div>
+              </div>
+              <div className="relative flex justify-center">
+                <span className="px-2 bg-gray-900 text-sm text-gray-400">
+                  or enter timestamp
+                </span>
+              </div>
+            </div>
+
+            <input 
+              type="text" 
+              value={newDueDate} 
+              onChange={e => setNewDueDate(e.target.value)}
+              className="w-full px-4 py-2 bg-gray-800 text-white rounded-lg border border-gray-700"
+              placeholder="Enter timestamp"
+              autoFocus
+            />
+            
+            {/* Show preview of selected date */}
+            {newDueDate && (
+              <div className="text-sm text-gray-400">
+                Will be set to: {formatDateTime(Number(newDueDate))}
+              </div>
+            )}
+
+            <div className="flex justify-end gap-3">
+              <button 
+                onClick={() => setEditingDate(false)}
+                className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600"
+                disabled={isUpdating}
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleSaveDate}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-500"
+                disabled={isUpdating}
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </Dialog>
       </div>
     );
   };
