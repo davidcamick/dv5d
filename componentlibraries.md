@@ -12,6 +12,7 @@ Actual good ones
 - ⭐ [**Aceternity UI**](https://ui.aceternity.com/) – GREAT components with great backgrounds and animations
 - - ⭐ [**Wicked Blocks**](https://www.wickedblocks.dev/) – A large collection of Tailwind component blocks for rapid prototyping.  
 ⭐- [**MUI (Material-UI)**](https://mui.com/material-ui) – A comprehensive UI library with a Material Design aesthetic, works well with Tailwind.
+- [**Bento Grids**](https://www.bentotailwind.com/) - Great bentos
 
 ones that could be useful ig
 
