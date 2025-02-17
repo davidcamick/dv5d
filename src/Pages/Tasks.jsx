@@ -475,8 +475,8 @@ export default function Tasks() {
     const twoDaysFromNow = Date.now() + (2 * 24 * 60 * 60 * 1000);
     return tasks.filter(task => 
       !task.completed && 
-      task.dueDate && 
-      task.dueDate <= twoDaysFromNow
+      task.due_date && 
+      task.due_date <= twoDaysFromNow
     ).length;
   };
 
@@ -517,7 +517,38 @@ export default function Tasks() {
   const TaskItem = ({ task, index }) => {
     const [isUpdating, setIsUpdating] = useState(false);
     const [newTag, setNewTag] = useState('');
-  
+    // Update state: ensure newDueDate is always a string
+    const [editingDate, setEditingDate] = useState(false);
+    const [newDueDate, setNewDueDate] = useState(task.due_date ? String(task.due_date) : '');
+
+    const handleSaveDate = async () => {
+      setIsUpdating(true);
+      const updatedTask = {
+        ...task,
+        dueDate: Number(newDueDate) || null,  // Use camelCase here
+        due_date: Number(newDueDate) || null   // Keep snake_case for API compatibility
+      };
+
+      try {
+        const response = await fetch(`${WORKER_URL}/${task.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(updatedTask)
+        });
+
+        if (!response.ok) throw new Error('Failed to update task');
+        await fetchTasks();
+      } catch (error) {
+        console.error('Error updating task:', error);
+        setError('Failed to update date. Please try again.');
+      } finally {
+        setIsUpdating(false);
+        setEditingDate(false);
+      }
+    };
+
     const handleAddTag = async (tagToAdd) => {
       setIsUpdating(true);
       const updatedTask = {
@@ -684,10 +715,40 @@ export default function Tasks() {
                     {/* Left Side Content */}
                     <div className="flex-1 flex flex-col gap-2">
                       <div className="flex items-center gap-1">
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-700 rounded-full text-xs text-gray-300">
+                        <span 
+                          className="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-700 rounded-full text-xs text-gray-300 cursor-pointer"
+                          onClick={() => setEditingDate(true)}
+                        >
                           <CalendarIcon className="w-4 h-4" />
                           {task.due_date ? formatDateTime(task.due_date) : 'No Date'}
                         </span>
+                        {editingDate && (
+                          <div className="absolute z-20 mt-2 p-2 bg-gray-900 border border-gray-700 rounded">
+                            <input 
+                              type="text" 
+                              value={newDueDate} 
+                              onChange={e => setNewDueDate(e.target.value)}
+                              className="px-2 py-1 bg-gray-800 text-white rounded"
+                              placeholder="Enter timestamp"
+                            />
+                            <div className="flex gap-2 mt-2">
+                              <button 
+                                onClick={handleSaveDate}
+                                className="px-2 py-1 bg-green-600 text-white rounded"
+                                disabled={isUpdating}
+                              >
+                                Save
+                              </button>
+                              <button 
+                                onClick={() => setEditingDate(false)}
+                                className="px-2 py-1 bg-red-600 text-white rounded"
+                                disabled={isUpdating}
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                       <div className="flex items-start">
                         <span className="px-2 py-0.5 bg-gray-700 rounded-full text-xs text-gray-300">
