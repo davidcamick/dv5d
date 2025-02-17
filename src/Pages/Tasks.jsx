@@ -11,13 +11,6 @@ import {
 import { AnimatedGridPattern } from '../components/ui/AnimatedGridPattern';
 import { AuroraText } from '../components/ui/AuroraText';
 import { Link } from 'react-router-dom';
-import {
-  ContextMenu,
-  ContextMenuTrigger,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuSeparator
-} from '../components/ui/ContextMenu';
 import { PRESET_COLORS } from '../constants/colors';
 
 const WORKER_URL = 'https://dv5d-tasks.accounts-abd.workers.dev';
@@ -521,456 +514,93 @@ export default function Tasks() {
   };
 
   const TaskItem = ({ task, index }) => {
-    const [isEditing, setIsEditing] = useState(false);
-    const [editingField, setEditingField] = useState(null);
-    const [editValue, setEditValue] = useState('');
-    const [editValues, setEditValues] = useState([]); // For multiple values like tags
-
-    const handleStartEdit = (field, value) => {
-      setEditingField(field);
-      if (Array.isArray(value)) {
-        setEditValues(value);
-      } else {
-        setEditValue(value || '');
-      }
-      setIsEditing(true);
-    };
-
-    const handleSave = async () => {
-      const updatedTask = { ...task };
-      
-      switch (editingField) {
-        case 'text':
-          updatedTask.text = editValue;
-          break;
-        case 'dueDate':
-          updatedTask.due_date = new Date(editValue).getTime();
-          break;
-        case 'color':
-          updatedTask.color = editValue;
-          break;
-        case 'priority':
-          updatedTask.priority = editValue;
-          break;
-        case 'tags':
-          updatedTask.tags = editValues;
-          break;
-        case 'links':
-          updatedTask.links = editValues;
-          break;
-        case 'notes':
-          updatedTask.notes = editValue;
-          break;
-      }
-
-      try {
-        const response = await fetch(`${WORKER_URL}/${task.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(updatedTask)
-        });
-
-        if (!response.ok) throw new Error('Failed to update task');
-        
-        // Update local state after successful API call
-        setTasks(prev => prev.map(t => 
-          t.id === task.id ? updatedTask : t
-        ));
-      } catch (error) {
-        console.error('Error updating task:', error);
-      }
-
-      setIsEditing(false);
-      setEditingField(null);
-    };
-
     return (
-      <div className="p-1"> {/* Add padding wrapper */}
-        <ContextMenu>
-          <ContextMenuTrigger>
-            <div className="relative">
-              <div className="relative bg-gray-800/50 rounded-xl p-4 shadow-lg hover:bg-gray-800/70 transition-all group">
-                <div className="relative z-10">
-                  <div className="flex items-start gap-4">
-                    <button
-                      onClick={() => handleTaskCompletion(task)}
-                      className="custom-checkbox mt-1.5 w-5 h-5 rounded-full border-2 border-gray-400 
-                              hover:border-white flex items-center justify-center 
-                              transition-all hover:scale-110 focus:outline-none group relative"
+      <div className="p-1">
+        <div className="relative">
+          <div className="relative bg-gray-800/50 rounded-xl p-4 shadow-lg hover:bg-gray-800/70 transition-all group">
+            <div className="relative z-10">
+              <div className="flex items-start gap-4">
+                <button
+                  onClick={() => handleTaskCompletion(task)}
+                  className="custom-checkbox mt-1.5 w-5 h-5 rounded-full border-2 border-gray-400 
+                          hover:border-white flex items-center justify-center 
+                          transition-all hover:scale-110 focus:outline-none group relative"
+                >
+                  <CheckIcon 
+                    className="w-4 h-4 text-white transform scale-0 
+                            group-hover:scale-75 transition-transform absolute" 
+                  />
+                </button>
+                <div className="flex-1 transform-gpu transition-all duration-300">
+                  <div className="flex items-center gap-2">
+                    <span 
+                      className={`text-lg ${task.completed ? 'line-through opacity-50' : ''}`}
+                      style={{ color: task.color || '#fff' }} 
                     >
-                      <CheckIcon 
-                        className="w-4 h-4 text-white transform scale-0 
-                                group-hover:scale-75 transition-transform absolute" 
-                      />
-                    </button>
-                    <div className="flex-1 transform-gpu transition-all duration-300">
-                      <div className="flex items-center gap-2">
-                        <span 
-                          className={`text-lg ${task.completed ? 'line-through opacity-50' : ''}`}
-                          style={{ color: task.color || '#fff' }} 
-                        >
-                          {task.text}
-                        </span>
-                        {task.priority && (
-                          <span className={`px-2 py-0.5 rounded text-xs ${
-                            task.priority === 'high' ? 'bg-red-500' :
-                            task.priority === 'medium' ? 'bg-yellow-500' :
-                            'bg-blue-500'
-                          }`}>
-                            {task.priority}
-                          </span>
-                        )}
-                      </div>
-                      {/* Fix the date display logic here */}
-                      {task.due_date && (
-                        <div className="flex items-center gap-1 text-gray-400 text-sm mt-1">
-                          <CalendarIcon className="w-4 h-4" />
-                          <span>{formatDateTime(task.due_date)}</span>
-                        </div>
-                      )}
-                      {task.tags?.length > 0 && (
-                        <div className="flex items-center gap-2 mt-2">
-                          <TagIcon className="w-4 h-4 text-gray-400" />
-                          {task.tags.map(tag => (
-                            <span key={tag} className="px-2 py-0.5 bg-gray-700 rounded-full text-xs text-white">
-                              {tag}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                      {task.links?.map(link => (
-                        <a
-                          key={link.url}
-                          href={link.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="mt-2 block p-2 rounded bg-gray-700/50 hover:bg-gray-700/70 text-blue-400 text-sm"
-                        >
-                          {link.url}
-                        </a>
-                      ))}
-                      {task.notes && (
-                        <p className="mt-2 text-gray-400 text-sm whitespace-pre-wrap">
-                          {task.notes}
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => openEditor(task)}
-                        className="p-2 text-gray-400 hover:text-white rounded-lg hover:bg-gray-700/50" 
-                      >
-                        <PencilIcon className="w-5 h-5" />
-                      </button>
-                      <button
-                        onClick={() => deleteTask(task.id)}
-                        className="p-2 text-red-400 hover:text-red-500 rounded-lg hover:bg-gray-700/50" 
-                      >
-                        ×
-                      </button>
-                    </div>
+                      {task.text}
+                    </span>
+                    {task.priority && (
+                      <span className={`px-2 py-0.5 rounded text-xs ${
+                        task.priority === 'high' ? 'bg-red-500' :
+                        task.priority === 'medium' ? 'bg-yellow-500' :
+                        'bg-blue-500'
+                      }`}>
+                        {task.priority}
+                      </span>
+                    )}
                   </div>
+                  {task.due_date && (
+                    <div className="flex items-center gap-1 text-gray-400 text-sm mt-1">
+                      <CalendarIcon className="w-4 h-4" />
+                      <span>{formatDateTime(task.due_date)}</span>
+                    </div>
+                  )}
+                  {task.tags?.length > 0 && (
+                    <div className="flex items-center gap-2 mt-2">
+                      <TagIcon className="w-4 h-4 text-gray-400" />
+                      {task.tags.map(tag => (
+                        <span key={tag} className="px-2 py-0.5 bg-gray-700 rounded-full text-xs text-white">
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {task.links?.map(link => (
+                    <a
+                      key={link.url}
+                      href={link.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-2 block p-2 rounded bg-gray-700/50 hover:bg-gray-700/70 text-blue-400 text-sm"
+                    >
+                      {link.url}
+                    </a>
+                  ))}
+                  {task.notes && (
+                    <p className="mt-2 text-gray-400 text-sm whitespace-pre-wrap">
+                      {task.notes}
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => openEditor(task)}
+                    className="p-2 text-gray-400 hover:text-white rounded-lg hover:bg-gray-700/50" 
+                  >
+                    <PencilIcon className="w-5 h-5" />
+                  </button>
+                  <button
+                    onClick={() => deleteTask(task.id)}
+                    className="p-2 text-red-400 hover:text-red-500 rounded-lg hover:bg-gray-700/50" 
+                  >
+                    ×
+                  </button>
                 </div>
               </div>
             </div>
-          </ContextMenuTrigger>
-          <ContextMenuContent>
-            <ContextMenuItem onClick={() => handleStartEdit('text', task.text)}>
-              <span>Rename Task</span>
-            </ContextMenuItem>
-            
-            <ContextMenuItem onClick={() => handleStartEdit('dueDate', task.due_date)}>
-              <span>Change Date and Time</span>
-            </ContextMenuItem>
-
-            <ContextMenuItem onClick={() => handleStartEdit('color', task.color || '#ffffff')}>
-              <span>Change Color</span>
-            </ContextMenuItem>
-
-            <ContextMenuItem onClick={() => handleStartEdit('priority', task.priority || 'medium')}>
-              <span>Change Priority</span>
-            </ContextMenuItem>
-
-            <ContextMenuItem onClick={() => handleStartEdit('tags', task.tags || [])}>
-              <span>Edit Tags</span>
-            </ContextMenuItem>
-
-            <ContextMenuItem onClick={() => handleStartEdit('links', task.links || [])}>
-              <span>Edit Links</span>
-            </ContextMenuItem>
-
-            <ContextMenuItem onClick={() => handleStartEdit('notes', task.notes || '')}>
-              <span>Edit Notes</span>
-            </ContextMenuItem>
-            
-            <ContextMenuSeparator />
-            
-            <ContextMenuItem
-              className="text-red-400 hover:text-red-300 focus:text-red-300"
-              onClick={() => deleteTask(task.id)}
-            >
-              <span>Delete Task</span>
-            </ContextMenuItem>
-          </ContextMenuContent>
-
-          {/* Inline editors */}
-          {isEditing && (
-            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-              <div className="bg-gray-800 rounded-lg p-4 min-w-[300px]">
-                {editingField === 'text' && (
-                  <>
-                    <input
-                      type="text"
-                      value={editValue}
-                      onChange={(e) => setEditValue(e.target.value)}
-                      className="w-full bg-gray-700 rounded px-3 py-2 text-white"
-                      autoFocus
-                    />
-                    <div className="flex justify-end gap-2 mt-4">
-                      <button
-                        onClick={() => setIsEditing(false)}
-                        className="px-3 py-1 rounded bg-gray-700 text-white"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={handleSave}
-                        className="px-3 py-1 rounded bg-blue-500 text-white"
-                      >
-                        Save
-                      </button>
-                    </div>
-                  </>
-                )}
-                
-                {editingField === 'dueDate' && (
-                  <>
-                    <input
-                      type="datetime-local"
-                      value={editValue ? new Date(editValue).toISOString().slice(0, 16) : ''}
-                      onChange={(e) => setEditValue(e.target.value)}
-                      className="w-full bg-gray-700 rounded px-3 py-2 text-white"
-                      autoFocus
-                    />
-                    <div className="flex justify-end gap-2 mt-4">
-                      <button
-                        onClick={() => setIsEditing(false)}
-                        className="px-3 py-1 rounded bg-gray-700 text-white"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={handleSave}
-                        className="px-3 py-1 rounded bg-blue-500 text-white"
-                      >
-                        Save
-                      </button>
-                    </div>
-                  </>
-                )}
-
-                {editingField === 'color' && (
-                  <>
-                    <div className="grid grid-cols-6 gap-2 max-h-[200px] overflow-y-auto p-1">
-                      {PRESET_COLORS.map(({ name, value }) => (
-                        <button
-                          key={value}
-                          onClick={() => setEditValue(value)}
-                          className={`w-full aspect-square rounded transition-all relative group ${
-                            editValue === value ? 'ring-2 ring-white scale-110' : 'hover:scale-105'
-                          }`}
-                          style={{ backgroundColor: value }}
-                          title={name}
-                        >
-                          {editValue === value && (
-                            <div className="absolute inset-0 flex items-center justify-center">
-                              <CheckIcon className="w-4 h-4 text-black" />
-                            </div>
-                          )}
-                        </button>
-                      ))}
-                    </div>
-                    <div className="flex justify-end gap-2 mt-4">
-                      <button
-                        onClick={() => setIsEditing(false)}
-                        className="px-3 py-1 rounded bg-gray-700 text-white"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={handleSave}
-                        className="px-3 py-1 rounded bg-blue-500 text-white"
-                      >
-                        Save
-                      </button>
-                    </div>
-                  </>
-                )}
-
-                {editingField === 'priority' && (
-                  <>
-                    <div className="space-y-2">
-                      {['high', 'medium', 'low'].map(priority => (
-                        <button
-                          key={priority}
-                          onClick={() => setEditValue(priority)}
-                          className={`w-full px-3 py-2 rounded text-left capitalize ${
-                            editValue === priority 
-                              ? 'bg-blue-500 text-white' 
-                              : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                          }`}
-                        >
-                          {priority}
-                        </button>
-                      ))}
-                    </div>
-                    <div className="flex justify-end gap-2 mt-4">
-                      <button
-                        onClick={() => setIsEditing(false)}
-                        className="px-3 py-1 rounded bg-gray-700 text-white"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={handleSave}
-                        className="px-3 py-1 rounded bg-blue-500 text-white"
-                      >
-                        Save
-                      </button>
-                    </div>
-                  </>
-                )}
-
-                {editingField === 'tags' && (
-                  <>
-                    <div className="space-y-2">
-                      <div className="flex flex-wrap gap-2 mb-2">
-                        {editValues.map((tag, index) => (
-                          <div key={index} className="flex items-center gap-1 bg-gray-700 rounded-full px-2 py-1">
-                            <span className="text-sm text-white">{tag}</span>
-                            <button
-                              onClick={() => setEditValues(prev => prev.filter((_, i) => i !== index))}
-                              className="text-gray-400 hover:text-white"
-                            >
-                              ×
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                      <input
-                        type="text"
-                        placeholder="Add tag and press Enter"
-                        className="w-full bg-gray-700 rounded px-3 py-2 text-white"
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' && e.target.value.trim()) {
-                            setEditValues(prev => [...prev, e.target.value.trim()]);
-                            e.target.value = '';
-                          }
-                        }}
-                      />
-                    </div>
-                    <div className="flex justify-end gap-2 mt-4">
-                      <button
-                        onClick={() => setIsEditing(false)}
-                        className="px-3 py-1 rounded bg-gray-700 text-white"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={handleSave}
-                        className="px-3 py-1 rounded bg-blue-500 text-white"
-                      >
-                        Save
-                      </button>
-                    </div>
-                  </>
-                )}
-
-                {editingField === 'links' && (
-                  <>
-                    <div className="space-y-2">
-                      <div className="flex flex-col gap-2 mb-2">
-                        {editValues.map((link, index) => (
-                          <div key={index} className="flex items-center gap-2 bg-gray-700 rounded px-2 py-1">
-                            <span className="text-sm text-white truncate flex-1">{link.url}</span>
-                            <button
-                              onClick={() => setEditValues(prev => prev.filter((_, i) => i !== index))}
-                              className="text-gray-400 hover:text-white p-1"
-                            >
-                              ×
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                      <input
-                        type="url"
-                        placeholder="Add URL and press Enter"
-                        className="w-full bg-gray-700 rounded px-3 py-2 text-white"
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' && e.target.value.trim()) {
-                            try {
-                              // Validate URL
-                              new URL(e.target.value);
-                              setEditValues(prev => [...prev, { url: e.target.value.trim() }]);
-                              e.target.value = '';
-                            } catch {
-                              // Invalid URL, show error state
-                              e.target.classList.add('border', 'border-red-500');
-                              setTimeout(() => {
-                                e.target.classList.remove('border', 'border-red-500');
-                              }, 2000);
-                            }
-                          }
-                        }}
-                      />
-                    </div>
-                    <div className="flex justify-end gap-2 mt-4">
-                      <button
-                        onClick={() => setIsEditing(false)}
-                        className="px-3 py-1 rounded bg-gray-700 text-white"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={handleSave}
-                        className="px-3 py-1 rounded bg-blue-500 text-white"
-                      >
-                        Save
-                      </button>
-                    </div>
-                  </>
-                )}
-
-                {editingField === 'notes' && (
-                  <>
-                    <textarea
-                      value={editValue}
-                      onChange={(e) => setEditValue(e.target.value)}
-                      placeholder="Add notes..."
-                      className="w-full bg-gray-700 rounded px-3 py-2 text-white min-h-[100px] resize-y"
-                      autoFocus
-                    />
-                    <div className="flex justify-end gap-2 mt-4">
-                      <button
-                        onClick={() => setIsEditing(false)}
-                        className="px-3 py-1 rounded bg-gray-700 text-white"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={handleSave}
-                        className="px-3 py-1 rounded bg-blue-500 text-white"
-                      >
-                        Save
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-          )}
-        </ContextMenu>
+          </div>
+        </div>
       </div>
     );
   };
